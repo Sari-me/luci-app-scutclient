@@ -10,6 +10,9 @@ on:
       - "Makefile"
       - "luasrc/**"
       - "root/**"
+      - "po/**"
+      - "htdocs/**"
+      - "luci-app-scutclient/**"
       - ".github/workflows/build.yml"
 
   pull_request:
@@ -23,13 +26,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+
 jobs:
   build:
     name: ${{ matrix.arch }} / OpenWrt 22.03.7
+
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
+
       matrix:
         arch:
           - x86_64
@@ -38,177 +44,421 @@ jobs:
           - arm_cortex-a7_neon-vfpv4
           - mipsel_24kc
 
+
     steps:
+
       - name: Checkout LuCI repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+
       - name: Prepare combined OpenWrt feed
         shell: bash
+
         run: |
           set -euxo pipefail
 
           rm -rf .ci-feed
           rm -rf .scutclient-core
 
-          #
-          # 1. Prepare luci-app-scutclient package.
-          #
-          # This repository itself is the LuCI package, so copy the repository
-          # root into one package directory below the temporary feed.
-          #
           mkdir -p .ci-feed/luci-app-scutclient
 
-          rsync -a \
-            --exclude=".git/" \
-            --exclude=".github/" \
-            --exclude=".ci-feed/" \
-            --exclude=".scutclient-core/" \
-            ./ .ci-feed/luci-app-scutclient/
+
+          echo "======================================"
+          echo "Repository tree"
+          echo "======================================"
+
+          find . \
+            -maxdepth 4 \
+            -type f \
+            ! -path "./.git/*" \
+            | sort
+
 
           #
-          # 2. Fetch Sari-me/scutclient.
+          # ----------------------------------------
+          # Prepare luci-app-scutclient
+          # ----------------------------------------
           #
-          # Do not use the original scutclient/scutclient OpenWrt recipe.
-          # The fork contains the bundled-source OpenWrt package definition
-          # used by its own GitHub Actions build.
+          # Makefile currently lives at repository
+          # root.
           #
+
+          test -f Makefile
+
+          cp \
+            Makefile \
+            .ci-feed/luci-app-scutclient/Makefile
+
+
+          #
+          # Support normal flat LuCI layout:
+          #
+          #   Makefile
+          #   luasrc/
+          #   root/
+          #   po/
+          #
+          # and the temporary nested layout:
+          #
+          #   Makefile
+          #   luci-app-scutclient/
+          #       luasrc/
+          #       root/
+          #       po/
+          #
+
+
+          copy_package_dir()
+          {
+            SRC="$1"
+            DST="$2"
+
+            if [ -d "$SRC" ]; then
+
+              echo "Copying:"
+              echo "  $SRC"
+              echo "->"
+              echo "  $DST"
+
+              mkdir -p "$DST"
+
+              rsync -a \
+                "$SRC/" \
+                "$DST/"
+            fi
+          }
+
+
+          #
+          # Flat repository layout
+          #
+
+          copy_package_dir \
+            "luasrc" \
+            ".ci-feed/luci-app-scutclient/luasrc"
+
+          copy_package_dir \
+            "root" \
+            ".ci-feed/luci-app-scutclient/root"
+
+          copy_package_dir \
+            "po" \
+            ".ci-feed/luci-app-scutclient/po"
+
+          copy_package_dir \
+            "htdocs" \
+            ".ci-feed/luci-app-scutclient/htdocs"
+
+
+          #
+          # Nested repository layout
+          #
+
+          copy_package_dir \
+            "luci-app-scutclient/luasrc" \
+            ".ci-feed/luci-app-scutclient/luasrc"
+
+          copy_package_dir \
+            "luci-app-scutclient/root" \
+            ".ci-feed/luci-app-scutclient/root"
+
+          copy_package_dir \
+            "luci-app-scutclient/po" \
+            ".ci-feed/luci-app-scutclient/po"
+
+          copy_package_dir \
+            "luci-app-scutclient/htdocs" \
+            ".ci-feed/luci-app-scutclient/htdocs"
+
+
+          echo "======================================"
+          echo "Validate luci-app-scutclient"
+          echo "======================================"
+
+          test -f \
+            .ci-feed/luci-app-scutclient/Makefile
+
+          test -d \
+            .ci-feed/luci-app-scutclient/luasrc
+
+
+          test -f \
+            .ci-feed/luci-app-scutclient/luasrc/controller/scutclient.lua
+
+          test -f \
+            .ci-feed/luci-app-scutclient/luasrc/model/cbi/scutclient/scutclient.lua
+
+
+          grep -q \
+            '^PKG_NAME:=luci-app-scutclient$' \
+            .ci-feed/luci-app-scutclient/Makefile
+
+
+          grep -q \
+            '^LUCI_DEPENDS:=.*+scutclient' \
+            .ci-feed/luci-app-scutclient/Makefile
+
+
+          echo "======================================"
+          echo "LuCI package tree"
+          echo "======================================"
+
+          find \
+            .ci-feed/luci-app-scutclient \
+            -maxdepth 6 \
+            -type f \
+            | sort
+
+
+
+          #
+          # ----------------------------------------
+          # Fetch Sari-me/scutclient
+          # ----------------------------------------
+          #
+
           git clone \
             --depth 1 \
             --branch master \
             https://github.com/Sari-me/scutclient.git \
             .scutclient-core
 
-          echo "===== scutclient source revision ====="
-          git -C .scutclient-core log -1 --oneline
-          git -C .scutclient-core rev-parse HEAD
+
+          echo "======================================"
+          echo "scutclient source revision"
+          echo "======================================"
+
+          git \
+            -C .scutclient-core \
+            log \
+            -1 \
+            --oneline
+
+          git \
+            -C .scutclient-core \
+            rev-parse \
+            HEAD
+
+
 
           #
-          # 3. Reproduce Sari-me/scutclient's own OpenWrt feed layout.
+          # ----------------------------------------
+          # Construct scutclient OpenWrt package
+          # ----------------------------------------
           #
-          # Expected package layout:
+          # Reproduce the same layout used by
+          # Sari-me/scutclient's own OpenWrt Action.
           #
-          # .ci-feed/scutclient/
-          #   Makefile
-          #   CMakeLists.txt
-          #   COPYING
-          #   src/
-          #   files/
-          #
-          mkdir -p .ci-feed/scutclient/files
+
+          mkdir -p \
+            .ci-feed/scutclient/files
+
 
           cp \
             .scutclient-core/openwrt/Makefile \
             .ci-feed/scutclient/Makefile
 
+
           cp \
             .scutclient-core/CMakeLists.txt \
             .ci-feed/scutclient/CMakeLists.txt
+
 
           cp \
             .scutclient-core/COPYING \
             .ci-feed/scutclient/COPYING
 
+
           cp -a \
             .scutclient-core/src \
             .ci-feed/scutclient/src
+
 
           cp \
             .scutclient-core/openwrt/files/scutclient.config \
             .ci-feed/scutclient/files/scutclient.config
 
+
           cp \
             .scutclient-core/openwrt/files/scutclient.init \
             .ci-feed/scutclient/files/scutclient.init
+
 
           cp \
             .scutclient-core/openwrt/files/scutclient.hotplug \
             .ci-feed/scutclient/files/scutclient.hotplug
 
-          #
-          # 4. Validate both packages before starting the SDK.
-          #
-          echo "===== validate luci-app-scutclient ====="
 
-          test -f .ci-feed/luci-app-scutclient/Makefile
-          test -d .ci-feed/luci-app-scutclient/luasrc
-          test -d .ci-feed/luci-app-scutclient/root
 
-          grep -q \
-            '^PKG_NAME:=luci-app-scutclient$' \
-            .ci-feed/luci-app-scutclient/Makefile
+          echo "======================================"
+          echo "Validate scutclient"
+          echo "======================================"
 
-          grep -q \
-            '^LUCI_DEPENDS:=.*+scutclient' \
-            .ci-feed/luci-app-scutclient/Makefile
+          test -f \
+            .ci-feed/scutclient/Makefile
 
-          echo "===== validate scutclient ====="
+          test -f \
+            .ci-feed/scutclient/CMakeLists.txt
 
-          test -f .ci-feed/scutclient/Makefile
-          test -f .ci-feed/scutclient/CMakeLists.txt
-          test -f .ci-feed/scutclient/COPYING
-          test -d .ci-feed/scutclient/src
-          test -f .ci-feed/scutclient/files/scutclient.config
-          test -f .ci-feed/scutclient/files/scutclient.init
-          test -f .ci-feed/scutclient/files/scutclient.hotplug
+          test -f \
+            .ci-feed/scutclient/COPYING
+
+          test -d \
+            .ci-feed/scutclient/src
+
+          test -f \
+            .ci-feed/scutclient/files/scutclient.config
+
+          test -f \
+            .ci-feed/scutclient/files/scutclient.init
+
+          test -f \
+            .ci-feed/scutclient/files/scutclient.hotplug
+
 
           grep -q \
             '^PKG_NAME:=scutclient$' \
             .ci-feed/scutclient/Makefile
 
-          echo "===== combined feed tree ====="
-          find .ci-feed -maxdepth 4 -type f -print | sort
+
+
+          echo "======================================"
+          echo "Complete OpenWrt feed"
+          echo "======================================"
+
+          find \
+            .ci-feed \
+            -maxdepth 6 \
+            -type f \
+            | sort
+
+
 
       - name: Build scutclient and LuCI package
         uses: openwrt/gh-action-sdk@main
+
         env:
+
           ARCH: ${{ matrix.arch }}-22.03.7
+
           FEED_DIR: ${{ github.workspace }}/.ci-feed
+
           FEEDNAME: scutclient_ci
-          PACKAGES: scutclient luci-app-scutclient
+
+          PACKAGES: >-
+            scutclient
+            luci-app-scutclient
+
           BUILD_LOG: 1
+
           NO_REFRESH_CHECK: 1
+
           NO_SHFMT_CHECK: 1
+
           V: s
+
+
 
       - name: Show build logs on failure
         if: failure()
+
         shell: bash
+
         run: |
-          echo "===== available logs ====="
-          find logs -type f -print 2>/dev/null || true
 
-          echo "===== dump logs ====="
-          while IFS= read -r log; do
-            echo "----- $log -----"
+          echo "======================================"
+          echo "Available logs"
+          echo "======================================"
+
+          find logs \
+            -type f \
+            -print \
+            2>/dev/null || true
+
+
+          echo "======================================"
+          echo "dump.txt"
+          echo "======================================"
+
+          while IFS= read -r log
+          do
+
+            echo
+            echo "--------------------------------------"
+            echo "$log"
+            echo "--------------------------------------"
+
             cat "$log" || true
+
           done < <(
-            find logs -type f -name "dump.txt" -print 2>/dev/null || true
+            find logs \
+              -type f \
+              -name "dump.txt" \
+              -print \
+              2>/dev/null || true
           )
 
-          echo "===== compile logs ====="
-          while IFS= read -r log; do
-            echo "----- $log -----"
-            tail -n 400 "$log" || true
+
+          echo "======================================"
+          echo "compile.txt"
+          echo "======================================"
+
+          while IFS= read -r log
+          do
+
+            echo
+            echo "--------------------------------------"
+            echo "$log"
+            echo "--------------------------------------"
+
+            tail \
+              -n 500 \
+              "$log" || true
+
           done < <(
-            find logs -type f -name "compile.txt" -print 2>/dev/null || true
+            find logs \
+              -type f \
+              -name "compile.txt" \
+              -print \
+              2>/dev/null || true
           )
+
+
 
       - name: Show generated packages
         if: always()
+
         shell: bash
+
         run: |
-          echo "===== generated packages ====="
-          find bin -type f \
-            \( -name "*.ipk" -o -name "*.apk" \) \
-            -print 2>/dev/null || true
+
+          echo "======================================"
+          echo "Generated packages"
+          echo "======================================"
+
+          find bin \
+            -type f \
+            \( \
+              -name "*.ipk" \
+              -o \
+              -name "*.apk" \
+            \) \
+            -print \
+            2>/dev/null || true
+
+
 
       - name: Upload IPK artifacts
         uses: actions/upload-artifact@v7
+
         with:
+
           name: scutclient-${{ matrix.arch }}-22.03.7
+
           path: |
             bin/packages/**/scutclient_ci/scutclient_*.ipk
             bin/packages/**/scutclient_ci/luci-app-scutclient_*.ipk
+
           if-no-files-found: error
