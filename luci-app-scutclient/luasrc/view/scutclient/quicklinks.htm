@@ -1,0 +1,22 @@
+<div class="cbi-section">
+	<div class="cbi-section-descr">
+		<%:Common OpenWrt pages used while preparing the authentication network.%>
+	</div>
+
+	<div style="display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0;">
+		<a class="cbi-button cbi-button-action"
+		   href="<%=luci.dispatcher.build_url('admin/network/wireless')%>">
+			<%:Wireless%>
+		</a>
+
+		<a class="cbi-button cbi-button-action"
+		   href="<%=luci.dispatcher.build_url('admin/network/network')%>">
+			<%:Interfaces%>
+		</a>
+
+		<a class="cbi-button cbi-button-action"
+		   href="<%=luci.dispatcher.build_url('admin/system/admin')%>">
+			<%:Administration%>
+		</a>
+	</div>
+</div>

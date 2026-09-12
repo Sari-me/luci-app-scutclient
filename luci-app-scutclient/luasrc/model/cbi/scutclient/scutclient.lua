@@ -1,108 +1,132 @@
--- LuCI by libc0607 (libc0607@gmail.com)
--- 华工路由群 262939451
--- 抄的
-string.split = function(s, p)
-	local rt = {}
-	string.gsub(s, '[^'..p..']+', function(w) table.insert(rt, w) end)
-	return rt
+-- LuCI configuration page for scutclient
+
+local uci = require "luci.model.uci".cursor()
+
+local function split_time(value)
+	local hour, minute = value:match("^(%d+):(%d+)$")
+	return tonumber(hour), tonumber(minute)
 end
 
-scut = Map(
-		"scutclient",
-		"华南理工大学客户端 设置",
-		' <input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="'
-				.."Step 1 : 点此处去设置Wi-Fi"
-				..'" onclick="javascript:location.href=\''
-				..luci.dispatcher.build_url("admin/network/wireless/radio0.network1")
-				..'\'"/>'
-				..' <input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="'
-				.."Step 2 : 点此处去设置IP"
-				..'" onclick="javascript:location.href=\''
-				..luci.dispatcher.build_url("admin/network/network")
-				..'\'"/>'
-				..' <input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="'
-				.."Step 3 : 点此处去修改路由器管理密码"
-				..'" onclick="javascript:location.href=\''
-				..luci.dispatcher.build_url("admin/system/admin")
-				..'\'"/>'
+local scut = Map(
+	"scutclient",
+	translate("SCUT Client Settings"),
+	translate("Configure the SCUT Dr.com client. Save the settings before restarting the service.")
 )
-function scut.on_commit(self)
-	luci.sys.call("uci commit")
-	luci.sys.call("rm -rf /tmp/luci-*cache")
-end
 
--- config option
-scut_option = scut:section(TypedSection, "option", translate("选项"))
-scut_option.anonymous = true
+local guide = scut:section(SimpleSection)
+guide.template = "scutclient/quicklinks"
 
-scut_option:option(Flag, "enable", "启用")
+local options = scut:section(TypedSection, "option", translate("General Settings"))
+options.anonymous = true
+options.addremove = false
 
--- config scutclient
-scut_client = scut:section(TypedSection, "scutclient", "用户信息")
-scut_client.anonymous = true
-scut_client:option(Value, "username", "拨号用户名", "学校提供的用户名，一般是学号")
-scut_client:option(Value, "password", "拨号密码").password = true
+local enable = options:option(Flag, "enable", translate("Enable"))
+enable.rmempty = false
+enable.default = "1"
 
--- config drcom
-scut_drcom = scut:section(TypedSection, "drcom", "Drcom设置")
-scut_drcom.anonymous = true
+local debug = options:option(Flag, "debug", translate("Debug logging"))
+debug.default = "0"
+debug.description = translate("Enable verbose scutclient debug output. Disable it during normal use.")
 
-scut_drcom_version = scut_drcom:option(Value, "version", "Drcom版本")
-scut_drcom_version.rmempty = false
-scut_drcom_version:value("4472434f4d0096022a")
-scut_drcom_version:value("4472434f4d0096022a00636b2031")
-scut_drcom_version:value("4472434f4d00cf072a00332e31332e302d32342d67656e65726963")
-scut_drcom_version.default = "4472434f4d0096022a"
-scut_drcom_hash = scut_drcom:option(Value, "hash", translate("DrAuthSvr.dll版本"))
-scut_drcom_hash.rmempty = false
-scut_drcom_hash:value("2ec15ad258aee9604b18f2f8114da38db16efd00")
-scut_drcom_hash:value("d985f3d51656a15837e00fab41d3013ecfb6313f")
-scut_drcom_hash:value("915e3d0281c3a0bdec36d7f9c15e7a16b59c12b8")
-scut_drcom_hash.default = "2ec15ad258aee9604b18f2f8114da38db16efd00"
-scut_drcom_server = scut_drcom:option(Value, "server_auth_ip", translate("服务器IP"))
-scut_drcom_server.rmempty = false
-scut_drcom_server.datatype = "ip4addr"
-scut_drcom_server:value("202.38.210.131")
-scut_drcom_nettime = scut_drcom:option(Value, "nettime", translate("允许上网时间"))
-scut_drcom_nettime.description = "允许的上网时间，断网后等待到指定时间重新开始认证。如6:15"
-scut_drcom_nettime.validate = function(self, value, t)
-	if (string.find(value, ":")) then
-		local sp = string.split(value, ":")
+local client = scut:section(TypedSection, "scutclient", translate("Account"))
+client.anonymous = true
+client.addremove = false
 
-		if (#sp == 2) then
-			local hour, minute = tonumber(sp[1]), tonumber(sp[2])
-			if (hour and minute and hour >= 0 and hour < 12 and minute >= 0 and minute < 60) then
-				return value
-			end
+local username = client:option(Value, "username", translate("Username"))
+username.rmempty = false
+username.description = translate("Usually your student number or the username issued by the university.")
+
+local password = client:option(Value, "password", translate("Password"))
+password.password = true
+password.rmempty = false
+
+local interface = client:option(ListValue, "interface", translate("Authentication interface"))
+interface.default = "wan"
+interface.rmempty = false
+
+local found_interface = false
+uci:foreach("network", "interface", function(section)
+	local name = section[".name"]
+	if name and name ~= "loopback" then
+		interface:value(name, name)
+		if name == "wan" then
+			found_interface = true
 		end
 	end
+end)
 
-	return nil, "上网时间格式错误！"
+if not found_interface then
+	interface:value("wan", "wan")
 end
 
---[[ 主机名列表预置
-    1.生成一个 DESKTOP-XXXXXXX 的随机
-    2.dhcp分配的第一个
-]]--
-scut_drcom_hostname = scut_drcom:option(Value, "hostname", translate("向服务器发送的主机名"))
-scut_drcom_hostname.rmempty = false
+interface.description = translate("Logical OpenWrt network interface used for authentication. The default is wan.")
+
+local drcom = scut:section(TypedSection, "drcom", translate("Dr.com Settings"))
+drcom.anonymous = true
+drcom.addremove = false
+
+local server = drcom:option(Value, "server_auth_ip", translate("Authentication server"))
+server.rmempty = false
+server.datatype = "ip4addr"
+server.default = "202.38.210.131"
+server:value("202.38.210.131")
+
+local dns = drcom:option(Value, "dns", translate("DNS server"))
+dns.rmempty = false
+dns.datatype = "ip4addr"
+dns.default = "222.201.130.30"
+
+local version = drcom:option(ListValue, "version", translate("Dr.com version"))
+version.rmempty = false
+version:value("4472434f4d0096022a")
+version:value("4472434f4d0096022a00636b2031")
+version:value("4472434f4d00cf072a00332e31332e302d32342d67656e65726963")
+version.default = "4472434f4d0096022a"
+
+local hash = drcom:option(ListValue, "hash", translate("DrAuthSvr.dll hash"))
+hash.rmempty = false
+hash:value("2ec15ad258aee9604b18f2f8114da38db16efd00")
+hash:value("d985f3d51656a15837e00fab41d3013ecfb6313f")
+hash:value("915e3d0281c3a0bdec36d7f9c15e7a16b59c12b8")
+hash.default = "2ec15ad258aee9604b18f2f8114da38db16efd00"
+
+local nettime = drcom:option(Value, "nettime", translate("Allowed online time"))
+nettime.description = translate("Duration accepted by scutclient, for example 6:15. Leave empty to use the daemon default.")
+nettime.rmempty = true
+nettime.validate = function(self, value)
+	if value == nil or value == "" then
+		return value
+	end
+
+	local hour, minute = split_time(value)
+	if hour and minute and hour >= 0 and hour < 12 and minute >= 0 and minute < 60 then
+		return value
+	end
+
+	return nil, translate("Invalid time format. Use H:MM, for example 6:15.")
+end
+
+local hostname = drcom:option(Value, "hostname", translate("Hostname sent to server"))
+hostname.rmempty = false
 
 local random_hostname = "DESKTOP-"
-local randtmp
-
 math.randomseed(os.time())
 for i = 1, 7 do
-	randtmp = math.random(1, 36)
-	random_hostname = (randtmp > 10)
-			and random_hostname..string.char(randtmp+54)
-			or  random_hostname..string.char(randtmp+47)
+	local value = math.random(1, 36)
+	if value > 10 then
+		random_hostname = random_hostname .. string.char(value + 54)
+	else
+		random_hostname = random_hostname .. string.char(value + 47)
+	end
 end
 
--- 获取dhcp列表，加入第一个主机名候选
-local dhcp_hostnames = string.split(luci.sys.exec("cat /tmp/dhcp.leases|awk {'print $4'}"), "\n") or {}
+hostname:value(random_hostname)
+hostname.default = random_hostname
 
-scut_drcom_hostname:value(random_hostname)
-scut_drcom_hostname:value(dhcp_hostnames[1])
-scut_drcom_hostname.default = random_hostname
+local lease_hostname = luci.sys.exec("awk 'NF >= 4 && $4 != \"*\" { print $4; exit }' /tmp/dhcp.leases 2>/dev/null")
+lease_hostname = (lease_hostname or ""):gsub("[\r\n]+$", "")
+if lease_hostname ~= "" then
+	hostname:value(lease_hostname)
+end
 
 return scut

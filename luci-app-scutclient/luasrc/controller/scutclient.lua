@@ -1,122 +1,209 @@
 module("luci.controller.scutclient", package.seeall)
 
-http = require "luci.http"
-fs = require "nixio.fs"
-sys  = require "luci.sys"
+local http = require "luci.http"
+local fs   = require "nixio.fs"
+local sys  = require "luci.sys"
 
-log_file = "/tmp/scutclient.log"
-log_file_backup = "/tmp/scutclient.log.backup.log"
+local log_file = "/tmp/scutclient.log"
+
+local function trim(value)
+	return (value or ""):gsub("[\r\n]+$", "")
+end
+
+local function json_response(data)
+	http.prepare_content("application/json")
+	http.write_json(data)
+end
+
+local function get_package_version()
+	local version = sys.exec(
+		"opkg status scutclient 2>/dev/null | " ..
+		"awk -F': ' '/^Version:/{print $2; exit}'"
+	)
+	return trim(version)
+end
+
+local function service_running()
+	return sys.call("pidof scutclient >/dev/null 2>&1") == 0
+end
 
 function index()
 	if not fs.access("/etc/config/scutclient") then
 		return
 	end
+
 	local uci = require "luci.model.uci".cursor()
-	local mainorder = uci:get_first("scutclient", "luci", "mainorder", 10)
+	local mainorder = tonumber(uci:get_first("scutclient", "luci", "mainorder")) or 10
 
-	entry({"admin", "services", "scutclient"},
-		alias("admin", "services", "scutclient", "settings"),
-		"华南理工大学客户端",
+	entry(
+		{"admin", "services", "scutclient"},
+		alias("admin", "services", "scutclient", "status"),
+		_("SCUT Client"),
 		mainorder
-	)
+	).dependent = true
 
-	entry({"admin", "services", "scutclient", "settings"},
-		cbi("scutclient/scutclient"),
-		"设置",
+	entry(
+		{"admin", "services", "scutclient", "status"},
+		template("scutclient/status"),
+		_("Status"),
 		10
 	).leaf = true
 
-	entry({"admin", "services", "scutclient", "status"},
-		call("action_status"),
-		"状态",
+	entry(
+		{"admin", "services", "scutclient", "settings"},
+		cbi("scutclient/scutclient"),
+		_("Settings"),
 		20
 	).leaf = true
 
-	entry({"admin", "services", "scutclient", "logs"}, template("scutclient/logs"), "日志", 30).leaf = true
-	entry({"admin", "services", "scutclient", "about"}, call("action_about"), "关于", 40).leaf = true
-	entry({"admin", "services", "scutclient", "get_log"}, call("get_log"))
-	entry({"admin", "services", "scutclient", "netstat"}, call("get_netstat"))
-	entry({"admin", "services", "scutclient", "scutclient-log.tar"}, call("get_dbgtar"))
+	entry(
+		{"admin", "services", "scutclient", "logs"},
+		template("scutclient/logs"),
+		_("Logs"),
+		30
+	).leaf = true
+
+	entry(
+		{"admin", "services", "scutclient", "about"},
+		template("scutclient/about"),
+		_("About"),
+		40
+	).leaf = true
+
+	entry(
+		{"admin", "services", "scutclient", "api_status"},
+		call("action_api_status")
+	).leaf = true
+
+	entry(
+		{"admin", "services", "scutclient", "api_netstat"},
+		call("action_api_netstat")
+	).leaf = true
+
+	-- 使用 LuCI 的 post() target，自动要求 POST 并校验 token。
+	entry(
+		{"admin", "services", "scutclient", "api_service"},
+		post("action_api_service")
+	).leaf = true
+
+	entry(
+		{"admin", "services", "scutclient", "get_log"},
+		call("action_get_log")
+	).leaf = true
+
+	entry(
+		{"admin", "services", "scutclient", "scutclient.log"},
+		call("action_download_log")
+	).leaf = true
 end
 
+function action_api_status()
+	local uci = require "luci.model.uci".cursor()
+	local ntm = require "luci.model.network".init()
 
-function get_log()
-	local send_log_lines = 75
-	if fs.access(log_file) then
-		client_log = sys.exec("tail -n "..send_log_lines.." " .. log_file)
-	else
-		client_log = "Unable to access the log file!"
-	end
+	local interface = uci:get_first("scutclient", "scutclient", "interface") or "wan"
+	local network = ntm:get_network(interface)
 
-	http.prepare_content("text/plain; charset=gbk")
-	http.write(client_log)
-	http.close()
-end
-
-function action_about()
-	luci.template.render("scutclient/about")
-end
-
-
-function action_status()
-	luci.template.render("scutclient/status")
-	if luci.http.formvalue("logoff") == "1" then
-		luci.sys.call("/etc/init.d/scutclient stop > /dev/null")
-	end
-	if luci.http.formvalue("redial") == "1" then
-		luci.sys.call("/etc/init.d/scutclient stop > /dev/null")
-		luci.sys.call("/etc/init.d/scutclient start > /dev/null")
-	end
-	if luci.http.formvalue("move_tag") == "1" then
-		luci.sys.call("uci set scutclient.@luci[-1].mainorder=90")
-		luci.sys.call("uci commit")
-		luci.sys.call("rm -rf /tmp/luci-*cache")
-	end
-end
-
-function get_netstat()
-	local hcontent = sys.exec("wget -O- http://whatismyip.akamai.com 2>/dev/null | head -n1")
-	local nstat = {}
-	if hcontent == '' then
-		nstat.stat = 'no_internet'
-	elseif hcontent:find("(%d+)%.(%d+)%.(%d+)%.(%d+)") then
-		nstat.stat = 'internet'
-	else
-		nstat.stat = 'no_login'
-	end
-	http.prepare_content("application/json")
-	http.write_json(nstat)
-	http.close()
-end
-
-function get_dbgtar()
-
-	local tar_dir = "/tmp/scutclient-log"
-	local tar_files = {
-		"/etc/config/wireless",
-		"/etc/config/network",
-		"/etc/config/system",
-		"/etc/config/scutclient",
-		"/etc/openwrt_release",
-		"/etc/crontabs/root",
-		"/etc/config/dhcp",
-		"/tmp/dhcp.leases",
-		"/etc/rc.local",
+	local result = {
+		running = service_running(),
+		enabled = uci:get_first("scutclient", "option", "enable") == "1",
+		version = get_package_version(),
+		interface = interface,
+		username = uci:get_first("scutclient", "scutclient", "username") or "",
+		hostname = uci:get_first("scutclient", "drcom", "hostname") or "",
+		server_auth_ip = uci:get_first("scutclient", "drcom", "server_auth_ip") or "",
+		ipaddr = "",
+		netmask = "",
+		gateway = "",
+		dns = "",
+		device = "",
+		mac = ""
 	}
 
-	fs.mkdirr(tar_dir)
-	table.foreach(tar_files, function(i, v)
-			luci.sys.call("cp " .. v .. " " .. tar_dir)
-	end)
+	if network then
+		result.ipaddr = network:ipaddr() or ""
+		result.netmask = network:netmask() or ""
+		result.gateway = network:gwaddr() or ""
 
-	if fs.access(log_file_backup) then
-		luci.sys.call("cat " .. log_file_backup .. " >> " .. tar_dir .. "/scutclient.log")
+		local dns = network:dnsaddrs() or {}
+		result.dns = table.concat(dns, ", ")
+
+		local device = network:get_interface()
+		if device then
+			result.device = device:name() or ""
+			result.mac = device:mac() or ""
+		end
 	end
+
+	json_response(result)
+end
+
+function action_api_netstat()
+	local output = trim(sys.exec(
+		"wget -q -T 3 -O- http://whatismyip.akamai.com 2>/dev/null | head -n 1"
+	))
+
+	local state = "unknown"
+
+	if output == "" then
+		state = "no_internet"
+	elseif output:match("^%d+%.%d+%.%d+%.%d+$") then
+		state = "internet"
+	else
+		state = "no_login"
+	end
+
+	json_response({ stat = state })
+end
+
+function action_api_service()
+	local action = http.formvalue("action") or ""
+	local rc = 1
+
+	if action == "start" then
+		rc = sys.call("/etc/init.d/scutclient start >/dev/null 2>&1")
+	elseif action == "stop" then
+		rc = sys.call("/etc/init.d/scutclient stop >/dev/null 2>&1")
+	elseif action == "restart" then
+		rc = sys.call("/etc/init.d/scutclient restart >/dev/null 2>&1")
+	elseif action == "logoff" then
+		rc = sys.call("/etc/init.d/scutclient logoff >/dev/null 2>&1")
+	else
+		http.status(400, "Bad Request")
+		json_response({
+			success = false,
+			message = "Unsupported action"
+		})
+		return
+	end
+
+	json_response({
+		success = rc == 0,
+		action = action
+	})
+end
+
+function action_get_log()
+	local content = ""
+
 	if fs.access(log_file) then
-		luci.sys.call("cat " .. log_file .. " >> " .. tar_dir .. "/scutclient.log")
+		content = sys.exec("tail -n 200 " .. log_file)
+	else
+		content = "No scutclient log is available."
 	end
-	http.prepare_content("application/octet-stream")
-	http.write(sys.exec("tar -C " .. tar_dir .. " -cf - ."))
-	luci.sys.call("rm -rf " .. tar_dir)
-	http.close()
+
+	http.prepare_content("text/plain; charset=utf-8")
+	http.write(content)
+end
+
+function action_download_log()
+	local content = ""
+
+	if fs.access(log_file) then
+		content = fs.readfile(log_file) or ""
+	end
+
+	http.header("Content-Disposition", 'attachment; filename="scutclient.log"')
+	http.prepare_content("text/plain; charset=utf-8")
+	http.write(content)
 end

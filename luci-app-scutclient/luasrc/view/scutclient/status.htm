@@ -1,283 +1,349 @@
-<%
--- LuCI by libc0607 (libc0607@gmail.com)
--- 华工路由群：262939451
-
-local sys  = require "luci.sys"
-local fs = require "nixio.fs"
-local uci = require "luci.model.uci".cursor()
-local ntm = require "luci.model.network".init()
-local scutclient_version = luci.sys.exec("opkg list-installed scutclient | cut -d ' ' -f 3")
-local scutclient_status = {}
-scutclient_status.enable = uci:get_first("scutclient", "option", "enable")
-scutclient_status.username = uci:get_first("scutclient", "scutclient", "username")
-scutclient_status.password = uci:get_first("scutclient", "scutclient", "password")
-scutclient_status.hostname = uci:get_first("scutclient", "drcom", "hostname")
-scutclient_status.version = uci:get_first("scutclient", "drcom", "version")
-scutclient_status.hash = uci:get_first("scutclient", "drcom", "hash")
-scutclient_status.server_auth_ip = uci:get_first("scutclient", "drcom", "server_auth_ip")
-local mode_links = {}
-mode_links.base = luci.dispatcher.build_url("admin/services/scutclient/status")
-mode_links.redial = mode_links.base.."?redial=1"
-mode_links.logoff = mode_links.base.."?logoff=1"
-mode_links.move_tag = mode_links.base .."?move_tag=1"
-
-local stat, wan_nets = pcall(ntm.get_wan_networks, ntm)
-local wan, wandev
-if stat then
-	if #wan_nets > 0 then
-		wan = wan_nets[1]
-		wandev = wan:get_interface()
-	end
-else
-	wan = ntm:get_wannet()
-	wandev = ntm:get_wandev()
-end
-
-function get_client_status(exec_name)
-	return (os.execute("pidof scutclient > /dev/null 2>/dev/null") == 0)
-end
-
-function get_wifi_switch()
-	return (string.sub(luci.sys.exec("wifi status|grep up|head -n 1|awk {'print $2'}"), 1, 4) == "true")
-		and true
-		or false
-end
-
-%>
-
-
 <%+header%>
 
-<h2>
-	<a id="content" name="content">客户端状态</a>
-</h2>
-<fieldset class="cbi-section">
-<legend>
-	<strong>状态</strong>
-</legend>
+<style type="text/css">
+.scut-status-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	margin-top: 1rem;
+}
 
-<div>
-	<table width="100%" cellspacing="10">
-		<tbody>
+.scut-status-card {
+	flex: 1 1 320px;
+	min-width: 0;
+	border: 1px solid rgba(127, 127, 127, .25);
+	border-radius: .35rem;
+	padding: 1rem;
+	box-sizing: border-box;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>scutclient</strong></td>
-				<% if get_client_status("scutclient") then %>
-				<td style="color: red;">正在运行</td>
-				<% else %>
-				<td style="color: red;">没有运行</td>
-				<% end %>
-			</tr>
+.scut-status-card h3 {
+	margin-top: 0;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<% if get_wifi_switch() then -%>
-				<td width="33%"><strong>Wi-Fi SSID ：</strong></td>
-				<td><%=luci.sys.exec("uci get wireless.@wifi-iface[0].ssid")%></td>
-				<% else %>
-				<td style="color: red;"><strong>Wi-Fi 状态:</strong></td>
-				<td style="color: red;"><strong>未开启，或路由器没有无线网卡</strong></td>
-				<% end %>
-			</tr>
+.scut-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: .55rem 0;
+	border-bottom: 1px solid rgba(127, 127, 127, .18);
+}
 
-			<% if wan then %>
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%">WAN口</td>
-				<td><%=wandev:name()%></td>
-			</tr>
+.scut-row:last-child {
+	border-bottom: 0;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2" id="all_status_ipaddr">
-				<td width="33%"><strong>IP地址</strong></td>
-				<td id="status_ipaddr"><%=wan:ipaddr()%></td>
-			</tr>
+.scut-label {
+	font-weight: 600;
+	flex: 0 0 42%;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>子网掩码</strong></td>
-				<td id="status_netmask"><%=wan:netmask()%></td>
-			</tr>
+.scut-value {
+	flex: 1 1 auto;
+	min-width: 0;
+	word-break: break-word;
+	text-align: right;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2" id="all_status_gateway">
-				<td width="33%"><strong>网关</strong></td>
-				<td id="status_gateway"><%=wan:gwaddr()%></td>
-			</tr>
+.scut-good {
+	color: #2d8a34;
+	font-weight: 600;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>DNS</strong></td>
-				<td id="status_dns"><%=table.concat(wan:dnsaddrs(), ",")%></td>
-			</tr>
+.scut-warn {
+	color: #c17d00;
+	font-weight: 600;
+}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<td width="33%"><strong>MAC</strong></td>
-				<td id="status_macaddr"><%=wandev:mac()%></td>
-			</tr>
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>网络状态</strong></td>
-				<td id="status_net">获取中……</td>
-			</tr>
-			<% else %>
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<td style="color: red;"><strong id="wan_status">WAN口未正确配置</strong></td>
-			</tr>
-			<% end %>
+.scut-bad {
+	color: #c9302c;
+	font-weight: 600;
+}
 
-		</tbody>
-	</table>
-</fieldset>
+.scut-muted {
+	opacity: .72;
+}
 
+.scut-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin-top: 1rem;
+}
 
+#scut-message {
+	margin-top: .75rem;
+}
 
+@media (max-width: 700px) {
+	.scut-status-grid {
+		display: block;
+	}
 
-<fieldset class="cbi-section">
-<legend>
-	<strong>客户端设置</strong>
-</legend>
+	.scut-status-card {
+		margin-bottom: 1rem;
+	}
 
-<div>
-	<table width="100%" cellspacing="10">
-		<tbody>
+	.scut-row {
+		display: block;
+	}
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>功能</strong></td>
-				<td>
-					<a href="<%=mode_links.logoff%>">下线</a>
-					<a href="<%=mode_links.redial%>">重拨</a>
-				</td>
-			</tr>
+	.scut-value {
+		text-align: left;
+		margin-top: .25rem;
+	}
+}
+</style>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<% if string.len(scutclient_version) > 1 then %>
-				<td width="33%"><strong>已安装版本：</strong></td>
-				<td><%=scutclient_version%></td>
-				<% else %>
-				<td style="color: red;"><strong>scutclient未安装</strong></td>
-				<% end %>
-			</tr>
+<h2><%:SCUT Client Status%></h2>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>开机启动</strong></td>
-				<td><%=scutclient_status.enable%></td>
-			</tr>
+<div class="cbi-map-descr">
+	<%:The page refreshes runtime information automatically. Account passwords are intentionally never displayed here.%>
+</div>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<td width="33%"><strong>账号</strong></td>
-				<% if scutclient_status.username == "root" then %>
-				<td style="color: red;"><%=scutclient_status.username%>。。。你的浏览器开启了自动保存帐号密码？</td>
-				<% else %>
-				<td><%=scutclient_status.username%></td>
-				<% end %>
-			</tr>
+<div class="scut-status-grid">
+	<div class="scut-status-card">
+		<h3><%:Service%></h3>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>密码</strong></td>
-				<td><%=scutclient_status.password%></td>
-			</tr>
+		<div class="scut-row">
+			<div class="scut-label"><%:Runtime status%></div>
+			<div class="scut-value" id="scut-running"><%:Loading…%></div>
+		</div>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>主机名</strong></td>
-				<td><%=scutclient_status.hostname%></td>
-			</tr>
+		<div class="scut-row">
+			<div class="scut-label"><%:Enabled%></div>
+			<div class="scut-value" id="scut-enabled">-</div>
+		</div>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<td width="33%"><strong>Drcom版本</strong></td>
-				<td><%=scutclient_status.version%></td>
-			</tr>
+		<div class="scut-row">
+			<div class="scut-label"><%:Installed version%></div>
+			<div class="scut-value" id="scut-version">-</div>
+		</div>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-1">
-				<td width="33%"><strong>Hash</strong></td>
-				<td><%=scutclient_status.hash%></td>
-			</tr>
+		<div class="scut-row">
+			<div class="scut-label"><%:Network status%></div>
+			<div class="scut-value" id="scut-netstat"><%:Loading…%></div>
+		</div>
 
-			<tr class="cbi-section-table-row cbi-rowstyle-2">
-				<td width="33%"><strong>服务器IP</strong></td>
-				<td><%=scutclient_status.server_auth_ip%></td>
-			</tr>
+		<div class="scut-actions">
+			<button class="cbi-button cbi-button-apply" type="button" onclick="serviceAction('start')">
+				<%:Start%>
+			</button>
+			<button class="cbi-button cbi-button-action" type="button" onclick="serviceAction('restart')">
+				<%:Restart%>
+			</button>
+			<button class="cbi-button cbi-button-reset" type="button" onclick="serviceAction('stop')">
+				<%:Stop%>
+			</button>
+			<button class="cbi-button" type="button" onclick="serviceAction('logoff')">
+				<%:Log off%>
+			</button>
+		</div>
 
-		</tbody>
-	</table>
-</fieldset>
+		<div id="scut-message" class="scut-muted"></div>
+	</div>
 
+	<div class="scut-status-card">
+		<h3><%:Authentication%></h3>
 
+		<div class="scut-row">
+			<div class="scut-label"><%:Username%></div>
+			<div class="scut-value" id="scut-username">-</div>
+		</div>
 
+		<div class="scut-row">
+			<div class="scut-label"><%:Authentication interface%></div>
+			<div class="scut-value" id="scut-interface">-</div>
+		</div>
 
-<script type="text/javascript" language="javascript">
-	window.alert = function(txt){
-			 var shield = document.createElement("DIV");
-			 shield.id = "shield";
-			 shield.style.position = "absolute";
-			 shield.style.left = "0px";
-			 shield.style.top = "0px";
-			 shield.style.width = "100%";
-			 shield.style.height = document.body.scrollHeight+"px";
-			 shield.style.background = "#333";
-			 shield.style.textAlign = "center";
-			 shield.style.zIndex = "10000";
-			 shield.style.filter = "alpha(opacity=0)";
-			 var alertFram = document.createElement("DIV");
-			 alertFram.id="alertFram";
-			 alertFram.style.position = "absolute";
-			 alertFram.style.left = "50%";
-			 alertFram.style.top = "50%";
-			 alertFram.style.marginLeft = "-225px";
-			 alertFram.style.marginTop = "-75px";
-			 alertFram.style.width = "450px";
-			 alertFram.style.height = "150px";
-			 alertFram.style.background = "#ccc";
-			 alertFram.style.textAlign = "center";
-			 alertFram.style.lineHeight = "150px";
-			 alertFram.style.zIndex = "10001";
-			 strHtml = "<ul class='ifacebox' style='list-style:none;margin:0px;padding:0px;width:100%'>";
-			 strHtml += " <li class='ifacebox-head' style='background:#DD828D;text-align:center;padding-left:20px;font-size:16px;font-weight:bold;height:25px;line-height:25px;border:1px solid #F9CADE;'><strong>温馨提示</strong></li>";
-			 strHtml += " <li class='ifacebox-body' style='background:#fff;text-align:center;font-size:20px;height:120px;line-height:40px;border-left:1px solid #F9CADE;border-right:1px solid #F9CADE;'onclick='doOk()'>"+txt+"</li>";
-			 strHtml += "</ul>";
-			 alertFram.innerHTML = strHtml;
-			 document.body.appendChild(alertFram);
-			 this.doOk = function(){
-				 alertFram.style.display = "none";
-				 shield.style.display = "none";
-			 }
-			 alertFram.focus();
-			 document.body.onselectstart = function(){return false;};
-			}
-	if(document.getElementById("wan_status") == null)
-	{
-		var ip = document.getElementById("status_ipaddr").innerHTML;
-		var gateway = document.getElementById("status_gateway").innerHTML;
-		var isCorrect = true;
-		for (var i=0;i<3;i++)
-		{
-			isCorrect = isCorrect && (parseInt(ip.match(/\d+/g)[i]) == parseInt(gateway.match(/\d+/g)[i]));
-		}
-		if(!isCorrect)
-		{
-			alert( ip + "<br/>"+ gateway +"<br/>前三位不一致，请看教程三遍！");
-			document.getElementById("all_status_ipaddr").style.color="red";
-			document.getElementById("all_status_gateway").style.color="red";
-		}
-		else
-		{
-			document.getElementById("all_status_ipaddr").style.color="black";
-			document.getElementById("all_status_gateway").style.color="black";
+		<div class="scut-row">
+			<div class="scut-label"><%:Hostname%></div>
+			<div class="scut-value" id="scut-hostname">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:Authentication server%></div>
+			<div class="scut-value" id="scut-server">-</div>
+		</div>
+	</div>
+
+	<div class="scut-status-card">
+		<h3><%:Interface%></h3>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:Device%></div>
+			<div class="scut-value" id="scut-device">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:IPv4 address%></div>
+			<div class="scut-value" id="scut-ipaddr">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:Netmask%></div>
+			<div class="scut-value" id="scut-netmask">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:Gateway%></div>
+			<div class="scut-value" id="scut-gateway">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:DNS%></div>
+			<div class="scut-value" id="scut-dns">-</div>
+		</div>
+
+		<div class="scut-row">
+			<div class="scut-label"><%:MAC address%></div>
+			<div class="scut-value" id="scut-mac">-</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+(function() {
+	var statusUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_status")%>';
+	var netstatUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_netstat")%>';
+	var serviceUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_service")%>';
+	var csrfToken = '<%=token%>';
+
+	function byId(id) {
+		return document.getElementById(id);
+	}
+
+	function text(id, value) {
+		var node = byId(id);
+		if (node) {
+			node.textContent = value === undefined || value === null || value === '' ? '-' : value;
 		}
 	}
 
-XHR.get('<%=luci.dispatcher.build_url("admin", "services", "scutclient", "netstat")%>', null, function(xhr, res) {
-	var statstr = "网络状态获取错误！";
-	var statelem = document.getElementById("status_net");
-	if (statelem) {
-		if (res !== null && typeof(res) === 'object') {
-			if (res['stat'] == 'internet') {
-				statstr = "网络正常";
-				statelem.style = "color: green";
-			} else if (res['stat'] == 'no_login') {
-				statstr = "校园网未登录";
-				statelem.style = "color: #FFA500";
-			} else if (res['stat'] == 'no_internet') {
-				statstr = "网络错误！检查网线/IP设置！";
-				statelem.style = "color: red";
-			}
+	function setState(id, value, className) {
+		var node = byId(id);
+		if (!node) {
+			return;
 		}
-		statelem.innerHTML = statstr;
-	}
-});
 
+		node.textContent = value;
+		node.className = 'scut-value ' + (className || '');
+	}
+
+	function request(method, url, body, done) {
+		var xhr = new XMLHttpRequest();
+		xhr.open(method, url, true);
+
+		if (method === 'POST') {
+			xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+		}
+
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== 4) {
+				return;
+			}
+
+			if (xhr.status >= 200 && xhr.status < 300) {
+				var data = null;
+				try {
+					data = JSON.parse(xhr.responseText);
+				} catch (e) {
+					data = null;
+				}
+				done(null, data);
+			} else {
+				done(new Error('HTTP ' + xhr.status), null);
+			}
+		};
+
+		xhr.send(body || null);
+	}
+
+	function refreshStatus() {
+		request('GET', statusUrl, null, function(err, data) {
+			if (err || !data) {
+				setState('scut-running', '<%:Unavailable%>', 'scut-bad');
+				return;
+			}
+
+			setState(
+				'scut-running',
+				data.running ? '<%:Running%>' : '<%:Stopped%>',
+				data.running ? 'scut-good' : 'scut-bad'
+			);
+
+			setState(
+				'scut-enabled',
+				data.enabled ? '<%:Yes%>' : '<%:No%>',
+				data.enabled ? 'scut-good' : 'scut-muted'
+			);
+
+			text('scut-version', data.version);
+			text('scut-username', data.username);
+			text('scut-interface', data.interface);
+			text('scut-hostname', data.hostname);
+			text('scut-server', data.server_auth_ip);
+			text('scut-device', data.device);
+			text('scut-ipaddr', data.ipaddr);
+			text('scut-netmask', data.netmask);
+			text('scut-gateway', data.gateway);
+			text('scut-dns', data.dns);
+			text('scut-mac', data.mac);
+		});
+	}
+
+	function refreshNetstat() {
+		request('GET', netstatUrl, null, function(err, data) {
+			if (err || !data) {
+				setState('scut-netstat', '<%:Unavailable%>', 'scut-bad');
+				return;
+			}
+
+			if (data.stat === 'internet') {
+				setState('scut-netstat', '<%:Internet available%>', 'scut-good');
+			} else if (data.stat === 'no_login') {
+				setState('scut-netstat', '<%:Campus authentication may be required%>', 'scut-warn');
+			} else if (data.stat === 'no_internet') {
+				setState('scut-netstat', '<%:No Internet connectivity%>', 'scut-bad');
+			} else {
+				setState('scut-netstat', '<%:Unknown%>', 'scut-muted');
+			}
+		});
+	}
+
+	window.serviceAction = function(action) {
+		var message = byId('scut-message');
+		if (message) {
+			message.textContent = '<%:Applying…%>';
+		}
+
+		request(
+			'POST',
+			serviceUrl,
+			'token=' + encodeURIComponent(csrfToken) + '&action=' + encodeURIComponent(action),
+			function(err, data) {
+				if (message) {
+					if (err || !data || !data.success) {
+						message.textContent = '<%:Operation failed.%>';
+						message.className = 'scut-bad';
+					} else {
+						message.textContent = '<%:Operation completed.%>';
+						message.className = 'scut-good';
+					}
+				}
+
+				window.setTimeout(refreshStatus, 700);
+			}
+		);
+	};
+
+	refreshStatus();
+	refreshNetstat();
+
+	window.setInterval(refreshStatus, 5000);
+	window.setInterval(refreshNetstat, 15000);
+})();
 </script>
+
 <%+footer%>

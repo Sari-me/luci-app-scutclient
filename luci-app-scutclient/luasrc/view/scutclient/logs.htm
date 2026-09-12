@@ -1,45 +1,81 @@
 <%+header%>
 
-<h2>
-	<a id="content" name="content">客户端日志</a>
-</h2>
+<style type="text/css">
+.scut-log-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin: .75rem 0;
+}
+
+#scut-log {
+	width: 100%;
+	min-height: 420px;
+	box-sizing: border-box;
+	font-family: monospace;
+	font-size: 12px;
+	line-height: 1.45;
+	resize: vertical;
+}
+</style>
+
+<h2><%:SCUT Client Logs%></h2>
 
 <div class="cbi-map-descr">
+	<%:The latest 200 lines are refreshed automatically. The download contains only the scutclient log and does not include UCI configuration or account passwords.%>
 </div>
 
-<table width="100%" cellspacing="10">
-	<tbody>
-		<tr class="cbi-section-table-row cbi-rowstyle-1">
-			<td width="33%"><strong>配置文件</strong></td>
-			<td><input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="打包下载" onclick='window.open("<%=luci.dispatcher.build_url('admin/services/scutclient/scutclient-log.tar')%>")'></td>
-	</tbody>
-</table>
+<div class="scut-log-actions">
+	<button class="cbi-button cbi-button-action" type="button" onclick="loadLog(true)">
+		<%:Refresh%>
+	</button>
 
-<h3>
-	scutclient日志
-</h3>
-
-<div id="content_logs">
-	<textarea style="font-size: 12px;" readonly="readonly" wrap="off" rows="50" id="syslog">
-		Collecting data...
-	</textarea>
+	<a class="cbi-button cbi-button-apply"
+	   href="<%=luci.dispatcher.build_url('admin', 'services', 'scutclient', 'scutclient.log')%>">
+		<%:Download log%>
+	</a>
 </div>
 
-<script type="text/javascript" language="javascript">
+<textarea id="scut-log" readonly="readonly" wrap="off"><%:Loading…%></textarea>
 
-readlog = function() {
-	XHR.get('<%=luci.dispatcher.build_url('admin/services/scutclient/get_log')%>', null,
-		function(x) {
-			var syslog_id = document.getElementById("syslog");
-			if (x.responseText != "_nodata_") {
-				syslog_id.innerHTML = x.responseText;
-			}
-			document.getElementById("syslog").scrollTop=document.getElementById("syslog").scrollHeight;
+<script type="text/javascript">
+(function() {
+	var logUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "get_log")%>';
+	var timer = null;
+
+	window.loadLog = function(forceScroll) {
+		var box = document.getElementById('scut-log');
+		var xhr = new XMLHttpRequest();
+
+		if (!box) {
+			return;
 		}
-	);
-}
-readlog();
-window.setInterval(readlog, 3000);
+
+		var nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 40;
+
+		xhr.open('GET', logUrl, true);
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== 4) {
+				return;
+			}
+
+			if (xhr.status >= 200 && xhr.status < 300) {
+				box.value = xhr.responseText || '';
+				if (forceScroll || nearBottom) {
+					box.scrollTop = box.scrollHeight;
+				}
+			} else {
+				box.value = '<%:Unable to load log.%>';
+			}
+		};
+		xhr.send(null);
+	};
+
+	window.loadLog(true);
+	timer = window.setInterval(function() {
+		window.loadLog(false);
+	}, 3000);
+})();
 </script>
 
 <%+footer%>
