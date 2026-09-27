@@ -73,8 +73,8 @@ msgstr "密码"
 msgid "Authentication interface"
 msgstr "认证接口"
 
-msgid "Used by %s"
-msgstr "已被 %s 使用"
+msgid "-- Select WAN interface --"
+msgstr "-- 请选择 WAN 接口 --"
 
 msgid "Logical OpenWrt network interface used for authentication. The service resolves it to the actual network device automatically. Each interface can only be bound by one instance."
 msgstr "用于认证的 OpenWrt 逻辑接口。服务会自动将其解析为真实网络设备。每个接口只能被一个实例绑定。"
@@ -82,8 +82,8 @@ msgstr "用于认证的 OpenWrt 逻辑接口。服务会自动将其解析为真
 msgid "Please select an interface."
 msgstr "请选择接口。"
 
-msgid "Interface '%s' is already used by instance '%s'. One WAN can only be bound by one instance."
-msgstr "接口 '%s' 已被实例 '%s' 使用。一个 WAN 只能被一个实例绑定。"
+msgid "Interface '%s' is already selected by instance '%s'. One WAN can only be bound by one instance."
+msgstr "接口 '%s' 已被实例 '%s' 选择。一个 WAN 只能被一个实例绑定。"
 
 msgid "MAC mode"
 msgstr "MAC 模式"

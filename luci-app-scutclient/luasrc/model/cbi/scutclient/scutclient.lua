@@ -33,6 +33,13 @@ local guide = scut:section(SimpleSection)
 guide.template = "scutclient/quicklinks"
 
 
+-- Real-time WAN lock (front-end UX only; the init script re-checks
+-- logical + netdev exclusivity on start)
+
+local lock = scut:section(SimpleSection)
+lock.template = "scutclient/interface_lock"
+
+
 -- General settings
 
 local options = scut:section(
@@ -137,22 +144,10 @@ local interface = instances:taboption(
 	translate("Authentication interface")
 )
 
-interface.default = "wan"
 interface.rmempty = false
 
-
--- 收集已被其他实例占用的接口，用于展示与校验
-local used_by = {}
-
-uci:foreach("scutclient", "scutclient", function(s)
-	local ifc = s.interface
-	local name = s[".name"]
-
-	if ifc and ifc ~= "" and name then
-		used_by[ifc] = used_by[ifc] or name
-	end
-end)
-
+-- 新实例必须显式选择 WAN，不再默认占用 wan
+interface:value("", translate("-- Select WAN interface --"))
 
 local found_wan = false
 
@@ -175,13 +170,6 @@ uci:foreach("network", "interface", function(section)
 			end
 		end
 
-		if used_by[name] then
-			title = title
-				.. " ["
-				.. translatef("Used by %s", used_by[name])
-				.. "]"
-		end
-
 		interface:value(name, title)
 
 		if name == "wan" then
@@ -200,32 +188,30 @@ interface.description = translate(
 	.. "Each interface can only be bound by one instance."
 )
 
+-- WAN 独占校验必须比较"本次表单准备提交的值"，而不是已 commit 的旧 UCI，
+-- 否则同一页面上另一实例刚改完的接口会被旧值误判为冲突。
 interface.validate = function(self, value, section)
 	if value == nil or value == "" then
 		return nil, translate("Please select an interface.")
 	end
 
-	local conflict = nil
+	for _, sid in ipairs(instances:cfgsections()) do
+		if sid ~= section then
+			local other = self:formvalue(sid)
 
-	uci:foreach("scutclient", "scutclient", function(s)
-		if conflict then
-			return
+			if other == nil then
+				other = self:cfgvalue(sid)
+			end
+
+			if other ~= nil and other ~= "" and other == value then
+				return nil, translatef(
+					"Interface '%s' is already selected by instance '%s'. "
+					.. "One WAN can only be bound by one instance.",
+					value,
+					sid
+				)
+			end
 		end
-
-		local name = s[".name"]
-
-		if name and name ~= section and s.interface == value then
-			conflict = name
-		end
-	end)
-
-	if conflict then
-		return nil, translatef(
-			"Interface '%s' is already used by instance '%s'. "
-			.. "One WAN can only be bound by one instance.",
-			value,
-			conflict
-		)
 	end
 
 	return value
