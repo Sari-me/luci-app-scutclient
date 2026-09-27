@@ -290,8 +290,16 @@
 		return age + 's';
 	}
 
+	var buttonClass = {
+		start: 'cbi-button cbi-button-action',
+		restart: 'cbi-button cbi-button-apply',
+		logoff: 'cbi-button cbi-button-reset',
+		stop: 'cbi-button cbi-button-negative'
+	};
+
 	function actionButton(action, instance, label) {
-		return '<button class="cbi-button" type="button" onclick="scutServiceAction(\'' +
+		return '<button class="' + (buttonClass[action] || 'cbi-button') +
+			'" type="button" onclick="scutServiceAction(\'' +
 			action + '\', \'' + esc(instance) + '\'); return false;">' + label + '</button>';
 	}
 
@@ -341,7 +349,7 @@
 		if (inst.running) {
 			h += actionButton('stop', inst.id, L.stop);
 		}
-		h += '<a class="cbi-button" href="' + logsUrl + '?instance=' +
+		h += '<a class="cbi-button cbi-button-edit" href="' + logsUrl + '?instance=' +
 			encodeURIComponent(inst.id) + '">' + L.logs + '</a>';
 		h += '</div>';
 
@@ -428,7 +436,11 @@
 					}
 				}
 
+				// 进程退出（portal 注销/EAPOL logoff）需要几秒，
+				// 多段延迟刷新让 Process state 尽快收敛
 				window.setTimeout(refreshStatus, 700);
+				window.setTimeout(refreshStatus, 2500);
+				window.setTimeout(refreshStatus, 5000);
 			}
 		);
 	};

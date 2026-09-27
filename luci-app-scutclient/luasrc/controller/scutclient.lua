@@ -543,19 +543,21 @@ function action_api_service()
 		return
 	end
 
-	local suffix = ""
-	if instance ~= "" then
-		suffix = "_instance " .. instance
-	end
-
-	if action == "start" then
-		rc = sys.call("/etc/init.d/scutclient start" .. suffix .. " >/dev/null 2>&1")
-	elseif action == "stop" then
-		rc = sys.call("/etc/init.d/scutclient stop" .. suffix .. " >/dev/null 2>&1")
-	elseif action == "restart" then
-		rc = sys.call("/etc/init.d/scutclient restart" .. suffix .. " >/dev/null 2>&1")
+	-- rc.common 原生支持按实例操作：start/stop/restart <id>；
+	-- logoff 需要 portal 参数，仍走 logoff_instance。
+	if action == "start" or action == "stop" or action == "restart" then
+		local target = action
+		if instance ~= "" then
+			target = action .. " " .. instance
+		end
+		rc = sys.call("/etc/init.d/scutclient " .. target .. " >/dev/null 2>&1")
 	elseif action == "logoff" then
-		rc = sys.call("/etc/init.d/scutclient logoff" .. suffix .. " >/dev/null 2>&1")
+		if instance ~= "" then
+			rc = sys.call("/etc/init.d/scutclient logoff_instance " ..
+				instance .. " >/dev/null 2>&1")
+		else
+			rc = sys.call("/etc/init.d/scutclient logoff >/dev/null 2>&1")
+		end
 	else
 		http.status(400, "Bad Request")
 		json_response({
