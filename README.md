@@ -69,6 +69,14 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 3. **多实例隔离**:点 WWAN 的探测/随机 MAC 按钮,只读写 WWAN 自己的字段。
 4. **dot1x 实例**:切回 802.1X 后 Location 与探测按钮隐藏,保存不受影响。
 
+## MWAN-safe 双 WAN 回归用例(后端 ≥ 3.3.0-3)
+
+1. **mwan3 off**:WAN dot1x 与 WWAN portal 分别单独认证正常。
+2. **mwan3 on**:WWAN portal 经 `mwan3 use wwan` 启动,HTTPS 443 稳定;抓包确认 chkstatus/login/logout 全部从 WWAN 真实网卡发出。
+3. **route_isolation A/B**:`native` 与 `mwan3` 对比测试,WAN UDP 心跳不再因 mwan3 分流丢失。
+4. **DHCP 地址变化**:`IFUPDATE_ADDRESSES=1` 触发 ifupdate,仅重启绑定该 WAN 的实例,新源 IPv4 生效。
+5. **多实例隔离**:WAN=dot1x、WWAN=portal 并存,WAN 不受 WWAN portal 流量影响。
+
 ## Portal Location 解析回归用例(后端 ≥ 3.3.0)
 
 1. **HTTPS 不降级**:Location 为 `https://...` 时,状态页/日志显示 chkstatus 走 `https://<host>:443`,绝不再出现 `http://<host>:80`。

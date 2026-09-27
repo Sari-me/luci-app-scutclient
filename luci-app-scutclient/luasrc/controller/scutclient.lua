@@ -443,6 +443,11 @@ function action_api_status()
 			inst.auth_detail = state.detail or ""
 			inst.auth_updated = tonumber(state.updated)
 			inst.heartbeat = tonumber(state.heartbeat)
+			-- 诊断字段（auth_method/device/route_isolation/source_ipv4/
+			-- portal_backend）由 C 核心写入，原样透传
+			inst.route_isolation = state.route_isolation or ""
+			inst.source_ipv4 = state.source_ipv4 or ""
+			inst.portal_backend = state.portal_backend or ""
 		else
 			inst.auth_state = fallback_instance_state(inst)
 			inst.auth_detail = ""
@@ -488,6 +493,7 @@ function action_api_portal_probe()
 
 	local output = trim(sys.exec(
 		"/usr/lib/scutclient/scutclient-portal-probe " ..
+		util.shellquote(interface) .. " " ..
 		util.shellquote(device) .. " " ..
 		util.shellquote(source_ip) .. " 2>/dev/null"
 	))

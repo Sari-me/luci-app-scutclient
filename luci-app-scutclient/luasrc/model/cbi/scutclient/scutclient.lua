@@ -496,6 +496,30 @@ end
 
 -- Advanced
 
+local route_isolation = instances:taboption(
+	"advanced",
+	ListValue,
+	"route_isolation",
+	translate("Routing isolation")
+)
+
+route_isolation.rmempty = true
+route_isolation.default = "auto"
+
+route_isolation:value(
+	"auto",
+	translate("Auto (mwan3 aware)")
+)
+route_isolation:value("native", translate("Native binding only"))
+route_isolation:value("mwan3", translate("Force mwan3 use"))
+
+route_isolation.description = translate(
+	"Auto launches the instance through 'mwan3 use' when mwan3 is "
+	.. "running, so authentication traffic keeps its WAN identity "
+	.. "under policy routing. Native uses the daemon bindings only."
+)
+
+
 local heartbeat_interval = instances:taboption(
 	"advanced",
 	Value,
