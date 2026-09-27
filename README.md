@@ -71,11 +71,11 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 
 **Program index 说明**:`/drcom/login` 的 `program_index` 属于门户页面运行时数据,当前版本仅支持在 Web Portal 页手动覆盖(留空则不携带该参数);是否必须携带取决于门户服务端,自动发现将在后续阶段实现。
 
-## MWAN-safe 双 WAN 回归用例(后端 ≥ 3.3.0-3)
+## MWAN-safe 双 WAN 回归用例(后端 ≥ 3.3.0-7)
 
 1. **mwan3 off**:WAN dot1x 与 WWAN portal 分别单独认证正常。
 2. **mwan3 on**:WWAN portal 经 `mwan3 use wwan` 启动,HTTPS 443 稳定;抓包确认 chkstatus/login/logout 全部从 WWAN 真实网卡发出。
-3. **route_isolation A/B**:`native` 与 `mwan3` 对比测试,WAN UDP 心跳不再因 mwan3 分流丢失。
+3. **route_isolation A/B**:`native` 与 `mwan3` 对比测试;dot1x 的 UDP socket 使用 mwan3 默认 mark 绕过策略分流,EAPOL 仍走原生 PF_PACKET。
 4. **DHCP 地址变化**:`IFUPDATE_ADDRESSES=1` 触发 ifupdate,仅重启绑定该 WAN 的实例,新源 IPv4 生效。
 5. **多实例隔离**:WAN=dot1x、WWAN=portal 并存,WAN 不受 WWAN portal 流量影响。
 
