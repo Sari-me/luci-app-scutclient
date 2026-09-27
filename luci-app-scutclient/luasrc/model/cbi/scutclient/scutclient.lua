@@ -82,7 +82,8 @@ instances.addremove = true
 
 
 instances:tab("basic", translate("Basic Settings"))
-instances:tab("drcom", translate("Dr.COM Settings"))
+instances:tab("drcom", translate("802.1X / Dr.COM"))
+instances:tab("portal", translate("Web Portal"))
 instances:tab("advanced", translate("Advanced Settings"))
 instances:tab("logging", translate("Logging"))
 
@@ -109,6 +110,33 @@ local inst_name = instances:taboption(
 
 inst_name.rmempty = true
 inst_name.placeholder = "Wired WAN"
+
+
+local auth_method = instances:taboption(
+	"basic",
+	ListValue,
+	"auth_method",
+	translate("Authentication method")
+)
+
+auth_method.rmempty = false
+auth_method.default = "dot1x"
+
+auth_method:value(
+	"dot1x",
+	translate("802.1X + Dr.COM")
+)
+
+auth_method:value(
+	"portal",
+	translate("Web Portal / Wireless authentication")
+)
+
+auth_method.description = translate(
+	"802.1X uses EAPOL and the Dr.COM UDP protocol. Web Portal detects "
+	.. "the captive portal Location on the selected WAN and logs in "
+	.. "through it."
+)
 
 
 local username = instances:taboption(
@@ -218,6 +246,54 @@ interface.validate = function(self, value, section)
 end
 
 
+-- Web Portal Location（仅 portal 模式显示）
+
+local portal_location = instances:taboption(
+	"basic",
+	Value,
+	"portal_location",
+	translate("Location")
+)
+
+portal_location.rmempty = true
+portal_location:depends("auth_method", "portal")
+
+portal_location.description = translate(
+	"Captive portal redirect URL. Select an authentication interface "
+	.. "and use the test button to detect it automatically, or enter it "
+	.. "manually. Re-test after the WAN or MAC configuration changes."
+)
+
+portal_location.validate = function(self, value)
+	if value == nil or value == "" then
+		return value
+	end
+
+	if #value > 4096 then
+		return nil, translate("Location is too long.")
+	end
+
+	if not value:match("^https?://") then
+		return nil, translate(
+			"Location must start with http:// or https://."
+		)
+	end
+
+	return value
+end
+
+
+local portal_probe = instances:taboption(
+	"basic",
+	DummyValue,
+	"_portal_probe"
+)
+
+portal_probe.rmempty = true
+portal_probe:depends("auth_method", "portal")
+portal_probe.template = "scutclient/portal_location_probe"
+
+
 -- MAC management
 
 local mac_mode = instances:taboption(
@@ -274,6 +350,8 @@ local server = instances:taboption(
 )
 
 server.rmempty = false
+
+server:depends("auth_method", "dot1x")
 server.datatype = "ip4addr"
 server.default = "202.38.210.131"
 
@@ -286,6 +364,8 @@ local dns = instances:taboption(
 )
 
 dns.rmempty = false
+
+dns:depends("auth_method", "dot1x")
 dns.datatype = "ip4addr"
 dns.default = "222.201.130.30"
 
@@ -298,6 +378,8 @@ local version = instances:taboption(
 )
 
 version.rmempty = false
+
+version:depends("auth_method", "dot1x")
 
 version:value(
 	"4472434f4d0096022a",
@@ -325,6 +407,8 @@ local hash = instances:taboption(
 )
 
 hash.rmempty = false
+
+hash:depends("auth_method", "dot1x")
 
 hash:value(
 	"2ec15ad258aee9604b18f2f8114da38db16efd00",
@@ -360,6 +444,8 @@ nettime.description = translate(
 
 nettime.rmempty = true
 
+nettime:depends("auth_method", "dot1x")
+
 nettime.validate = function(self, value)
 	if value == nil or value == "" then
 		return value
@@ -391,6 +477,8 @@ local hostname = instances:taboption(
 )
 
 hostname.rmempty = false
+
+hostname:depends("auth_method", "dot1x")
 hostname.default = "Lenovo-PC"
 
 
@@ -558,6 +646,100 @@ log_file.rmempty = false
 log_file.default = "1"
 log_file.description = translate(
 	"Write this instance's log to /tmp/scutclient/<instance>.log."
+)
+
+
+-- Web Portal
+
+local portal_protocol = instances:taboption(
+	"portal",
+	ListValue,
+	"portal_protocol",
+	translate("Portal protocol")
+)
+
+portal_protocol.rmempty = false
+portal_protocol.default = "eportal"
+portal_protocol:depends("auth_method", "portal")
+
+portal_protocol:value("eportal", "ePortal")
+portal_protocol:value("drcom", "Dr.COM Web")
+
+
+local portal_service_type = instances:taboption(
+	"portal",
+	Value,
+	"portal_service_type",
+	translate("Service type")
+)
+
+portal_service_type.rmempty = true
+portal_service_type.placeholder = "campus"
+portal_service_type:depends("auth_method", "portal")
+
+
+local portal_suffix = instances:taboption(
+	"portal",
+	Value,
+	"portal_suffix",
+	translate("Account suffix")
+)
+
+portal_suffix.rmempty = true
+portal_suffix:depends("auth_method", "portal")
+
+
+local portal_connect_timeout = instances:taboption(
+	"portal",
+	Value,
+	"portal_connect_timeout",
+	translate("Connect timeout (seconds)")
+)
+
+portal_connect_timeout.rmempty = true
+portal_connect_timeout.placeholder = "5"
+portal_connect_timeout.datatype = "and(uinteger,min(1),max(60))"
+portal_connect_timeout:depends("auth_method", "portal")
+
+
+local portal_timeout = instances:taboption(
+	"portal",
+	Value,
+	"portal_timeout",
+	translate("Request timeout (seconds)")
+)
+
+portal_timeout.rmempty = true
+portal_timeout.placeholder = "10"
+portal_timeout.datatype = "and(uinteger,min(1),max(120))"
+portal_timeout:depends("auth_method", "portal")
+
+
+local portal_check_interval = instances:taboption(
+	"portal",
+	Value,
+	"portal_check_interval",
+	translate("Online check interval (seconds)")
+)
+
+portal_check_interval.rmempty = true
+portal_check_interval.placeholder = "15"
+portal_check_interval.datatype = "and(uinteger,min(5),max(3600))"
+portal_check_interval:depends("auth_method", "portal")
+
+
+local portal_tls_verify = instances:taboption(
+	"portal",
+	Flag,
+	"portal_tls_verify",
+	translate("Verify TLS certificates")
+)
+
+portal_tls_verify.rmempty = false
+portal_tls_verify.default = "1"
+portal_tls_verify:depends("auth_method", "portal")
+portal_tls_verify.description = translate(
+	"Validate https:// portal certificates against the system CA bundle."
 )
 
 
