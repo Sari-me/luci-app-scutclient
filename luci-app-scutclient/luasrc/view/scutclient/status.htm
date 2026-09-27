@@ -104,20 +104,30 @@
 <h2><%:SCUT Client Status%></h2>
 
 <div class="cbi-map-descr">
-	<%:Overview of every authentication instance. Account passwords are intentionally never displayed here.%>
+	<%:Every instance reports its own authentication, process and interface state. Account passwords are intentionally never displayed here.%>
 </div>
 
-<div class="scut-row">
-	<div class="scut-label"><%:Service%></div>
-	<div class="scut-value">
-		<span id="scut-enabled">-</span>
-		<span class="scut-muted" id="scut-version"></span>
+<div id="scut-summary" class="scut-status-card">
+	<div class="scut-row">
+		<div class="scut-label"><%:Master service%></div>
+		<div class="scut-value" id="scut-enabled">-</div>
 	</div>
-</div>
-
-<div class="scut-row">
-	<div class="scut-label"><%:Network status%></div>
-	<div class="scut-value" id="scut-netstat"><%:Loading…%></div>
+	<div class="scut-row">
+		<div class="scut-label"><%:Installed version%></div>
+		<div class="scut-value" id="scut-version">-</div>
+	</div>
+	<div class="scut-row">
+		<div class="scut-label"><%:Configured instances%></div>
+		<div class="scut-value" id="scut-count">-</div>
+	</div>
+	<div class="scut-row">
+		<div class="scut-label"><%:Running instances%></div>
+		<div class="scut-value" id="scut-running-count">-</div>
+	</div>
+	<div class="scut-row">
+		<div class="scut-label"><%:Online instances%></div>
+		<div class="scut-value" id="scut-online-count">-</div>
+	</div>
 </div>
 
 <div id="scut-instances" class="scut-status-grid">
@@ -129,7 +139,6 @@
 <script type="text/javascript">
 (function() {
 	var statusUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_status")%>';
-	var netstatUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_netstat")%>';
 	var serviceUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_service")%>';
 	var logsUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "logs")%>';
 	var csrfToken = '<%=token%>';
@@ -144,16 +153,31 @@
 		stop: '<%:Stop%>',
 		logoff: '<%:Log off%>',
 		logs: '<%:Logs%>',
-		state: '<%:State%>',
-		enabled: '<%:Enabled%>',
+		authState: '<%:Authentication state%>',
+		processState: '<%:Process state%>',
+		interfaceState: '<%:Interface state%>',
 		account: '<%:Account%>',
 		network: '<%:Network%>',
 		device: '<%:Device%>',
 		ipaddr: '<%:IPv4 address%>',
-		mac: '<%:MAC address%>',
+		runtimeMac: '<%:Runtime MAC%>',
+		configuredMac: '<%:Configured MAC%>',
+		macStatus: '<%:MAC status%>',
+		match: '<%:Match%>',
+		mismatch: '<%:Mismatch%>',
 		server: '<%:Authentication server%>',
 		pid: '<%:PID%>',
-		version: '<%:Installed version%>',
+		lastHeartbeat: '<%:Last heartbeat%>',
+		online: '<%:Online%>',
+		authenticating: '<%:Authenticating%>',
+		reconnecting: '<%:Reconnecting%>',
+		authFailed: '<%:Authentication failed%>',
+		waitingInterface: '<%:Waiting for interface%>',
+		disabled: '<%:Disabled%>',
+		error: '<%:Error%>',
+		unknown: '<%:Unknown%>',
+		up: 'UP',
+		down: 'DOWN',
 		unavailable: '<%:Unavailable%>',
 		applying: '<%:Applying…%>',
 		completed: '<%:Operation completed.%>',
@@ -173,6 +197,16 @@
 
 	function dash(value) {
 		return (value === undefined || value === null || value === '') ? '-' : esc(value);
+	}
+
+	function mask(value) {
+		if (!value) {
+			return '-';
+		}
+
+		return esc(String(value).length > 4
+			? String(value).substring(0, 4) + '****'
+			: '****');
 	}
 
 	function request(method, url, body, done) {
@@ -211,31 +245,92 @@
 			'</div>';
 	}
 
+	function authStateHtml(inst) {
+		var state = inst.auth_state || 'unknown';
+
+		switch (state) {
+		case 'online':
+			return '<span class="scut-good">' + L.online + '</span>';
+
+		case 'authenticating':
+		case 'drcom_starting':
+		case 'starting':
+			return '<span class="scut-warn">' + L.authenticating + '</span>';
+
+		case 'reconnecting':
+			return '<span class="scut-warn">' + L.reconnecting + '</span>';
+
+		case 'auth_failed':
+			return '<span class="scut-bad">' + L.authFailed + '</span>';
+
+		case 'error':
+			return '<span class="scut-bad">' + L.error + '</span>';
+
+		case 'waiting_interface':
+			return '<span class="scut-warn">' + L.waitingInterface + '</span>';
+
+		case 'disabled':
+			return '<span class="scut-muted">' + L.disabled + '</span>';
+
+		case 'stopped':
+			return '<span class="scut-bad">' + L.stopped + '</span>';
+
+		default:
+			return '<span class="scut-muted">' + L.unknown + '</span>';
+		}
+	}
+
+	function secondsAgo(epoch) {
+		if (!epoch) {
+			return '-';
+		}
+
+		var age = Math.max(0, Math.floor(Date.now() / 1000) - epoch);
+
+		return age + 's';
+	}
+
 	function actionButton(action, instance, label) {
 		return '<button class="cbi-button" type="button" onclick="scutServiceAction(\'' +
 			action + '\', \'' + esc(instance) + '\'); return false;">' + label + '</button>';
 	}
 
 	function instanceCard(inst) {
-		var state = inst.running
-			? '<span class="scut-good">' + L.running + '</span>'
-			: '<span class="scut-bad">' + L.stopped + '</span>';
-
 		var h = '<div class="scut-status-card">';
 		h += '<h3>' + dash(inst.name) +
 			' <span class="scut-muted">(' + dash(inst.id) + ')</span></h3>';
 
-		h += row(L.state, state);
-		h += row(L.enabled, inst.enabled
-			? '<span class="scut-good">' + L.yes + '</span>'
-			: L.no);
-		h += row(L.account, dash(inst.username));
+		h += row(L.authState, authStateHtml(inst));
+
+		h += row(L.processState, inst.running
+			? '<span class="scut-good">' + L.running + '</span>'
+			: '<span class="scut-bad">' + L.stopped + '</span>');
+
+		h += row(L.interfaceState, inst.interface_up
+			? '<span class="scut-good">' + L.up + '</span>'
+			: '<span class="scut-bad">' + L.down + '</span>');
+
+		h += row(L.account, mask(inst.username));
 		h += row(L.network, dash(inst.interface));
 		h += row(L.device, dash(inst.device));
 		h += row(L.ipaddr, dash(inst.ipaddr));
-		h += row(L.mac, dash(inst.mac));
+
+		h += row(L.runtimeMac, dash(inst.mac));
+
+		if (inst.configured_mac) {
+			h += row(L.configuredMac, esc(inst.configured_mac));
+		}
+
+		h += row(L.macStatus,
+			inst.mac_match === true
+				? '<span class="scut-good">' + L.match + '</span>'
+			: inst.mac_match === false
+				? '<span class="scut-bad">' + L.mismatch + '</span>'
+				: '<span class="scut-muted">-</span>');
+
 		h += row(L.server, dash(inst.server));
 		h += row(L.pid, dash(inst.pid));
+		h += row(L.lastHeartbeat, secondsAgo(inst.heartbeat));
 
 		h += '<div class="scut-actions">';
 		if (!inst.running) {
@@ -257,11 +352,12 @@
 	function render(data) {
 		var host = byId('scut-instances');
 		var html = '';
+		var i;
 
 		if (!data || !data.instances || !data.instances.length) {
 			html = '<div class="scut-muted">' + L.noInstances + '</div>';
 		} else {
-			for (var i = 0; i < data.instances.length; i++) {
+			for (i = 0; i < data.instances.length; i++) {
 				html += instanceCard(data.instances[i]);
 			}
 		}
@@ -277,8 +373,25 @@
 
 		var version = byId('scut-version');
 		if (version) {
-			version.textContent = data && data.version ? data.version : '';
+			version.textContent = data && data.version ? data.version : '-';
 		}
+
+		var instances = (data && data.instances) || [];
+		var running = 0;
+		var online = 0;
+
+		for (i = 0; i < instances.length; i++) {
+			if (instances[i].running) {
+				running++;
+			}
+			if (instances[i].auth_state === 'online') {
+				online++;
+			}
+		}
+
+		byId('scut-count').textContent = String(instances.length);
+		byId('scut-running-count').textContent = String(running);
+		byId('scut-online-count').textContent = String(online);
 	}
 
 	function refreshStatus() {
@@ -289,30 +402,6 @@
 				return;
 			}
 			render(data);
-		});
-	}
-
-	function refreshNetstat() {
-		request('GET', netstatUrl, null, function(err, data) {
-			var node = byId('scut-netstat');
-
-			if (err || !data || !node) {
-				if (node) {
-					node.textContent = L.unavailable;
-					node.className = 'scut-value scut-bad';
-				}
-				return;
-			}
-
-			if (data.stat === 'internet') {
-				node.innerHTML = '<span class="scut-good"><%:Internet available%></span>';
-			} else if (data.stat === 'no_login') {
-				node.innerHTML = '<span class="scut-warn"><%:Campus authentication may be required%></span>';
-			} else if (data.stat === 'no_internet') {
-				node.innerHTML = '<span class="scut-bad"><%:No Internet connectivity%></span>';
-			} else {
-				node.innerHTML = '<span class="scut-muted"><%:Unknown%></span>';
-			}
 		});
 	}
 
@@ -345,10 +434,8 @@
 	};
 
 	refreshStatus();
-	refreshNetstat();
 
 	window.setInterval(refreshStatus, 5000);
-	window.setInterval(refreshNetstat, 15000);
 })();
 </script>
 

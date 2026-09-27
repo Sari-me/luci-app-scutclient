@@ -158,6 +158,51 @@ local function runtime_mac(device)
 	return ""
 end
 
+-- 读取 C 核心写入的实例运行状态文件（.tmp + rename 原子替换，
+-- 不会读到半写内容）。格式：state=/detail=/updated=/heartbeat=
+local function read_instance_state(id)
+	if not safe_id(id) then
+		return nil
+	end
+
+	local path = state_dir .. "/" .. id .. ".state"
+
+	local content = fs.readfile(path)
+
+	if not content then
+		return nil
+	end
+
+	local state = {}
+
+	for line in content:gmatch("[^\r\n]+") do
+		local key, value = line:match("^([%w_]+)=(.*)$")
+
+		if key then
+			state[key] = value
+		end
+	end
+
+	return state
+end
+
+-- 无状态文件时的回退推断；running 绝不能 fallback 成 online。
+local function fallback_instance_state(inst)
+	if not inst.enabled then
+		return "disabled"
+	end
+
+	if not inst.interface_up then
+		return "waiting_interface"
+	end
+
+	if not inst.running then
+		return "stopped"
+	end
+
+	return "starting"
+end
+
 local function check_instance_param(instance)
 	if not safe_id(instance) or not valid_instance(instance) then
 		http.status(400, "Bad Request")
@@ -269,7 +314,13 @@ function action_api_status()
 
 			configured_mac = normalize_mac(s.macaddr or ""),
 			mac = "",
-			mac_source = ""
+			mac_source = "",
+
+			process_state = "stopped",
+			auth_state = "unknown",
+			auth_detail = "",
+			auth_updated = nil,
+			heartbeat = nil
 		}
 
 		local p = procd[id]
@@ -322,6 +373,20 @@ function action_api_status()
 			inst.mac_match =
 				inst.mac:upper() == inst.configured_mac:upper()
 		end
+
+		local state = read_instance_state(id)
+
+		if state then
+			inst.auth_state = state.state or "unknown"
+			inst.auth_detail = state.detail or ""
+			inst.auth_updated = tonumber(state.updated)
+			inst.heartbeat = tonumber(state.heartbeat)
+		else
+			inst.auth_state = fallback_instance_state(inst)
+			inst.auth_detail = ""
+		end
+
+		inst.process_state = inst.running and "running" or "stopped"
 
 		instances[#instances + 1] = inst
 	end)

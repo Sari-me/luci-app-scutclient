@@ -195,14 +195,20 @@ msgstr "系统管理"
 msgid "SCUT Client Status"
 msgstr "SCUT 客户端状态"
 
-msgid "Overview of every authentication instance. Account passwords are intentionally never displayed here."
-msgstr "所有认证实例的总览。此处刻意不显示账号密码。"
+msgid "Every instance reports its own authentication, process and interface state. Account passwords are intentionally never displayed here."
+msgstr "每个实例独立上报认证、进程与接口状态。此处刻意不显示账号密码。"
 
-msgid "Service"
-msgstr "服务"
+msgid "Master service"
+msgstr "服务总开关"
 
-msgid "Network status"
-msgstr "网络状态"
+msgid "Configured instances"
+msgstr "已配置实例"
+
+msgid "Running instances"
+msgstr "运行中实例"
+
+msgid "Online instances"
+msgstr "在线实例"
 
 msgid "Loading…"
 msgstr "加载中…"
@@ -231,8 +237,35 @@ msgstr "停止"
 msgid "Log off"
 msgstr "下线"
 
-msgid "State"
-msgstr "状态"
+msgid "Authentication state"
+msgstr "认证状态"
+
+msgid "Process state"
+msgstr "进程状态"
+
+msgid "Interface state"
+msgstr "接口状态"
+
+msgid "Online"
+msgstr "在线"
+
+msgid "Authenticating"
+msgstr "认证中"
+
+msgid "Reconnecting"
+msgstr "重连中"
+
+msgid "Authentication failed"
+msgstr "认证失败"
+
+msgid "Waiting for interface"
+msgstr "等待接口"
+
+msgid "Disabled"
+msgstr "已禁用"
+
+msgid "Error"
+msgstr "错误"
 
 msgid "Account"
 msgstr "账号"
@@ -245,6 +278,27 @@ msgstr "设备"
 
 msgid "IPv4 address"
 msgstr "IPv4 地址"
+
+msgid "Runtime MAC"
+msgstr "运行时 MAC"
+
+msgid "Configured MAC"
+msgstr "配置 MAC"
+
+msgid "MAC status"
+msgstr "MAC 状态"
+
+msgid "Match"
+msgstr "一致"
+
+msgid "Mismatch"
+msgstr "不一致"
+
+msgid "Last heartbeat"
+msgstr "最近心跳"
+
+msgid "Authentication server"
+msgstr "认证服务器"
 
 msgid "PID"
 msgstr "PID"
@@ -266,15 +320,6 @@ msgstr "操作失败。"
 
 msgid "No instances configured. Add one on the Settings page."
 msgstr "尚未配置实例。请在设置页添加。"
-
-msgid "Internet available"
-msgstr "互联网可用"
-
-msgid "Campus authentication may be required"
-msgstr "可能需要进行校园网认证"
-
-msgid "No Internet connectivity"
-msgstr "无互联网连接"
 
 msgid "Unknown"
 msgstr "未知"
