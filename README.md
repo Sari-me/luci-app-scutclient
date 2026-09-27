@@ -42,3 +42,13 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 - **Logs**:按实例查看 `/tmp/scutclient/<实例>.log`,支持等级过滤、行数选择、自动刷新、清空与下载。
 - MAC 模式(keep/random/custom)由后端 `/usr/lib/scutclient/scutclient-mac` 持久化并应用到有线设备或无线 STA 接口,认证进程通过 `--expected-mac` 校验是否生效。
 - 旧版单账号配置(全局 `drcom` 节)会在服务启动时自动迁移为实例 `default`,并写入 `option.main.config_version='2'` 防止重复迁移。
+
+## 状态页回归测试用例
+
+每轮改动后至少覆盖以下场景(需 `scutclient` ≥ 3.2.0-3,核心会把认证状态写入 `/var/run/scutclient/<实例>.state`):
+
+1. **WWAN runtime MAC**:`ubus call network.interface.wwan status` 取 `l3_device`,与 `cat /sys/class/net/<device>/address` 比对——状态卡"运行时 MAC"必须显示同一个值(不再显示 `-`)。
+2. **MAC 一致性**:配置了 MAC 的实例,实际网卡 MAC 与配置一致时显示 `一致`,不一致(如手动改了 MAC)时必须同时显示运行时 MAC、配置 MAC 和 `不一致`。
+3. **实例独立认证状态**:一个实例用正确账号、另一个故意用错误密码,两张卡应分别显示 `在线` 与 `认证失败`,而不是共享一个全局网络状态。
+4. **心跳超时**:人为阻断 WWAN 心跳后,该实例显示 `重连中` 且进程仍为 `运行中`(状态不再等同于 PID)。
+5. **无线掉线隔离**:`ifdown wwan` 后 WWAN 显示 `等待接口`/`已停止`,WAN 实例状态不变;`ifup wwan` 后 WWAN 自动恢复。
