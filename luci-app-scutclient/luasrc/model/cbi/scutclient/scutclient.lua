@@ -349,7 +349,7 @@ local server = instances:taboption(
 	translate("Authentication server")
 )
 
-server.rmempty = false
+server.rmempty = true
 
 server:depends("auth_method", "dot1x")
 server.datatype = "ip4addr"
@@ -363,7 +363,7 @@ local dns = instances:taboption(
 	translate("DNS server")
 )
 
-dns.rmempty = false
+dns.rmempty = true
 
 dns:depends("auth_method", "dot1x")
 dns.datatype = "ip4addr"
@@ -377,7 +377,7 @@ local version = instances:taboption(
 	translate("Dr.com version")
 )
 
-version.rmempty = false
+version.rmempty = true
 
 version:depends("auth_method", "dot1x")
 
@@ -406,7 +406,7 @@ local hash = instances:taboption(
 	translate("DrAuthSvr.dll hash")
 )
 
-hash.rmempty = false
+hash.rmempty = true
 
 hash:depends("auth_method", "dot1x")
 
@@ -476,7 +476,7 @@ local hostname = instances:taboption(
 	translate("Hostname sent to server")
 )
 
-hostname.rmempty = false
+hostname.rmempty = true
 
 hostname:depends("auth_method", "dot1x")
 hostname.default = "Lenovo-PC"
@@ -658,24 +658,12 @@ local portal_protocol = instances:taboption(
 	translate("Portal protocol")
 )
 
-portal_protocol.rmempty = false
+portal_protocol.rmempty = true
 portal_protocol.default = "eportal"
 portal_protocol:depends("auth_method", "portal")
 
 portal_protocol:value("eportal", "ePortal")
 portal_protocol:value("drcom", "Dr.COM Web")
-
-
-local portal_service_type = instances:taboption(
-	"portal",
-	Value,
-	"portal_service_type",
-	translate("Service type")
-)
-
-portal_service_type.rmempty = true
-portal_service_type.placeholder = "campus"
-portal_service_type:depends("auth_method", "portal")
 
 
 local portal_suffix = instances:taboption(
@@ -687,6 +675,12 @@ local portal_suffix = instances:taboption(
 
 portal_suffix.rmempty = true
 portal_suffix:depends("auth_method", "portal")
+
+portal_suffix.description = translate(
+	"Optional account suffix. "
+	.. "Leave empty for normal campus accounts. "
+	.. "Examples: @dx, @lt."
+)
 
 
 local portal_connect_timeout = instances:taboption(
