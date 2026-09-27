@@ -19,6 +19,7 @@
 
 .scut-status-card h3 {
 	margin-top: 0;
+	word-break: break-word;
 }
 
 .scut-row {
@@ -72,6 +73,10 @@
 	margin-top: 1rem;
 }
 
+.scut-actions .cbi-button {
+	text-decoration: none;
+}
+
 #scut-message {
 	margin-top: .75rem;
 }
@@ -99,136 +104,75 @@
 <h2><%:SCUT Client Status%></h2>
 
 <div class="cbi-map-descr">
-	<%:The page refreshes runtime information automatically. Account passwords are intentionally never displayed here.%>
+	<%:Overview of every authentication instance. Account passwords are intentionally never displayed here.%>
 </div>
 
-<div class="scut-status-grid">
-	<div class="scut-status-card">
-		<h3><%:Service%></h3>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Runtime status%></div>
-			<div class="scut-value" id="scut-running"><%:Loading…%></div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Enabled%></div>
-			<div class="scut-value" id="scut-enabled">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Installed version%></div>
-			<div class="scut-value" id="scut-version">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Network status%></div>
-			<div class="scut-value" id="scut-netstat"><%:Loading…%></div>
-		</div>
-
-		<div class="scut-actions">
-			<button class="cbi-button cbi-button-apply" type="button" onclick="serviceAction('start')">
-				<%:Start%>
-			</button>
-			<button class="cbi-button cbi-button-action" type="button" onclick="serviceAction('restart')">
-				<%:Restart%>
-			</button>
-			<button class="cbi-button cbi-button-reset" type="button" onclick="serviceAction('stop')">
-				<%:Stop%>
-			</button>
-			<button class="cbi-button" type="button" onclick="serviceAction('logoff')">
-				<%:Log off%>
-			</button>
-		</div>
-
-		<div id="scut-message" class="scut-muted"></div>
-	</div>
-
-	<div class="scut-status-card">
-		<h3><%:Authentication%></h3>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Username%></div>
-			<div class="scut-value" id="scut-username">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Authentication interface%></div>
-			<div class="scut-value" id="scut-interface">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Hostname%></div>
-			<div class="scut-value" id="scut-hostname">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Authentication server%></div>
-			<div class="scut-value" id="scut-server">-</div>
-		</div>
-	</div>
-
-	<div class="scut-status-card">
-		<h3><%:Interface%></h3>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Device%></div>
-			<div class="scut-value" id="scut-device">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:IPv4 address%></div>
-			<div class="scut-value" id="scut-ipaddr">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Netmask%></div>
-			<div class="scut-value" id="scut-netmask">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:Gateway%></div>
-			<div class="scut-value" id="scut-gateway">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:DNS%></div>
-			<div class="scut-value" id="scut-dns">-</div>
-		</div>
-
-		<div class="scut-row">
-			<div class="scut-label"><%:MAC address%></div>
-			<div class="scut-value" id="scut-mac">-</div>
-		</div>
+<div class="scut-row">
+	<div class="scut-label"><%:Service%></div>
+	<div class="scut-value">
+		<span id="scut-enabled">-</span>
+		<span class="scut-muted" id="scut-version"></span>
 	</div>
 </div>
+
+<div class="scut-row">
+	<div class="scut-label"><%:Network status%></div>
+	<div class="scut-value" id="scut-netstat"><%:Loading…%></div>
+</div>
+
+<div id="scut-instances" class="scut-status-grid">
+	<div class="scut-muted"><%:Loading…%></div>
+</div>
+
+<div id="scut-message" class="scut-muted"></div>
 
 <script type="text/javascript">
 (function() {
 	var statusUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_status")%>';
 	var netstatUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_netstat")%>';
 	var serviceUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_service")%>';
+	var logsUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "logs")%>';
 	var csrfToken = '<%=token%>';
+
+	var L = {
+		running: '<%:Running%>',
+		stopped: '<%:Stopped%>',
+		yes: '<%:Yes%>',
+		no: '<%:No%>',
+		start: '<%:Start%>',
+		restart: '<%:Restart%>',
+		stop: '<%:Stop%>',
+		logoff: '<%:Log off%>',
+		logs: '<%:Logs%>',
+		state: '<%:State%>',
+		enabled: '<%:Enabled%>',
+		account: '<%:Account%>',
+		network: '<%:Network%>',
+		device: '<%:Device%>',
+		ipaddr: '<%:IPv4 address%>',
+		mac: '<%:MAC address%>',
+		server: '<%:Authentication server%>',
+		pid: '<%:PID%>',
+		version: '<%:Installed version%>',
+		unavailable: '<%:Unavailable%>',
+		applying: '<%:Applying…%>',
+		completed: '<%:Operation completed.%>',
+		failed: '<%:Operation failed.%>',
+		noInstances: '<%:No instances configured. Add one on the Settings page.%>'
+	};
 
 	function byId(id) {
 		return document.getElementById(id);
 	}
 
-	function text(id, value) {
-		var node = byId(id);
-		if (node) {
-			node.textContent = value === undefined || value === null || value === '' ? '-' : value;
-		}
+	function esc(value) {
+		var node = document.createElement('span');
+		node.textContent = value === undefined || value === null ? '' : String(value);
+		return node.innerHTML;
 	}
 
-	function setState(id, value, className) {
-		var node = byId(id);
-		if (!node) {
-			return;
-		}
-
-		node.textContent = value;
-		node.className = 'scut-value ' + (className || '');
+	function dash(value) {
+		return (value === undefined || value === null || value === '') ? '-' : esc(value);
 	}
 
 	function request(method, url, body, done) {
@@ -260,75 +204,137 @@
 		xhr.send(body || null);
 	}
 
+	function row(label, value) {
+		return '<div class="scut-row">' +
+			'<div class="scut-label">' + label + '</div>' +
+			'<div class="scut-value">' + value + '</div>' +
+			'</div>';
+	}
+
+	function actionButton(action, instance, label) {
+		return '<button class="cbi-button" type="button" onclick="scutServiceAction(\'' +
+			action + '\', \'' + esc(instance) + '\'); return false;">' + label + '</button>';
+	}
+
+	function instanceCard(inst) {
+		var state = inst.running
+			? '<span class="scut-good">' + L.running + '</span>'
+			: '<span class="scut-bad">' + L.stopped + '</span>';
+
+		var h = '<div class="scut-status-card">';
+		h += '<h3>' + dash(inst.name) +
+			' <span class="scut-muted">(' + dash(inst.id) + ')</span></h3>';
+
+		h += row(L.state, state);
+		h += row(L.enabled, inst.enabled
+			? '<span class="scut-good">' + L.yes + '</span>'
+			: L.no);
+		h += row(L.account, dash(inst.username));
+		h += row(L.network, dash(inst.interface));
+		h += row(L.device, dash(inst.device));
+		h += row(L.ipaddr, dash(inst.ipaddr));
+		h += row(L.mac, dash(inst.mac));
+		h += row(L.server, dash(inst.server));
+		h += row(L.pid, dash(inst.pid));
+
+		h += '<div class="scut-actions">';
+		if (!inst.running) {
+			h += actionButton('start', inst.id, L.start);
+		}
+		h += actionButton('restart', inst.id, L.restart);
+		h += actionButton('logoff', inst.id, L.logoff);
+		if (inst.running) {
+			h += actionButton('stop', inst.id, L.stop);
+		}
+		h += '<a class="cbi-button" href="' + logsUrl + '?instance=' +
+			encodeURIComponent(inst.id) + '">' + L.logs + '</a>';
+		h += '</div>';
+
+		h += '</div>';
+		return h;
+	}
+
+	function render(data) {
+		var host = byId('scut-instances');
+		var html = '';
+
+		if (!data || !data.instances || !data.instances.length) {
+			html = '<div class="scut-muted">' + L.noInstances + '</div>';
+		} else {
+			for (var i = 0; i < data.instances.length; i++) {
+				html += instanceCard(data.instances[i]);
+			}
+		}
+
+		host.innerHTML = html;
+
+		var enabled = byId('scut-enabled');
+		if (enabled) {
+			enabled.innerHTML = data && data.enabled
+				? '<span class="scut-good">' + L.yes + '</span>'
+				: L.no;
+		}
+
+		var version = byId('scut-version');
+		if (version) {
+			version.textContent = data && data.version ? data.version : '';
+		}
+	}
+
 	function refreshStatus() {
 		request('GET', statusUrl, null, function(err, data) {
 			if (err || !data) {
-				setState('scut-running', '<%:Unavailable%>', 'scut-bad');
+				byId('scut-instances').innerHTML =
+					'<div class="scut-bad">' + L.unavailable + '</div>';
 				return;
 			}
-
-			setState(
-				'scut-running',
-				data.running ? '<%:Running%>' : '<%:Stopped%>',
-				data.running ? 'scut-good' : 'scut-bad'
-			);
-
-			setState(
-				'scut-enabled',
-				data.enabled ? '<%:Yes%>' : '<%:No%>',
-				data.enabled ? 'scut-good' : 'scut-muted'
-			);
-
-			text('scut-version', data.version);
-			text('scut-username', data.username);
-			text('scut-interface', data.interface);
-			text('scut-hostname', data.hostname);
-			text('scut-server', data.server_auth_ip);
-			text('scut-device', data.device);
-			text('scut-ipaddr', data.ipaddr);
-			text('scut-netmask', data.netmask);
-			text('scut-gateway', data.gateway);
-			text('scut-dns', data.dns);
-			text('scut-mac', data.mac);
+			render(data);
 		});
 	}
 
 	function refreshNetstat() {
 		request('GET', netstatUrl, null, function(err, data) {
-			if (err || !data) {
-				setState('scut-netstat', '<%:Unavailable%>', 'scut-bad');
+			var node = byId('scut-netstat');
+
+			if (err || !data || !node) {
+				if (node) {
+					node.textContent = L.unavailable;
+					node.className = 'scut-value scut-bad';
+				}
 				return;
 			}
 
 			if (data.stat === 'internet') {
-				setState('scut-netstat', '<%:Internet available%>', 'scut-good');
+				node.innerHTML = '<span class="scut-good"><%:Internet available%></span>';
 			} else if (data.stat === 'no_login') {
-				setState('scut-netstat', '<%:Campus authentication may be required%>', 'scut-warn');
+				node.innerHTML = '<span class="scut-warn"><%:Campus authentication may be required%></span>';
 			} else if (data.stat === 'no_internet') {
-				setState('scut-netstat', '<%:No Internet connectivity%>', 'scut-bad');
+				node.innerHTML = '<span class="scut-bad"><%:No Internet connectivity%></span>';
 			} else {
-				setState('scut-netstat', '<%:Unknown%>', 'scut-muted');
+				node.innerHTML = '<span class="scut-muted"><%:Unknown%></span>';
 			}
 		});
 	}
 
-	window.serviceAction = function(action) {
+	window.scutServiceAction = function(action, instance) {
 		var message = byId('scut-message');
 		if (message) {
-			message.textContent = '<%:Applying…%>';
+			message.textContent = L.applying;
 		}
 
 		request(
 			'POST',
 			serviceUrl,
-			'token=' + encodeURIComponent(csrfToken) + '&action=' + encodeURIComponent(action),
+			'token=' + encodeURIComponent(csrfToken) +
+			'&action=' + encodeURIComponent(action) +
+			'&instance=' + encodeURIComponent(instance || ''),
 			function(err, data) {
 				if (message) {
 					if (err || !data || !data.success) {
-						message.textContent = '<%:Operation failed.%>';
+						message.textContent = L.failed;
 						message.className = 'scut-bad';
 					} else {
-						message.textContent = '<%:Operation completed.%>';
+						message.textContent = L.completed;
 						message.className = 'scut-good';
 					}
 				}
