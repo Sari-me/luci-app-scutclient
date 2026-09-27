@@ -1,7 +1,8 @@
--- LuCI configuration page for scutclient
+-- LuCI configuration page for scutclient (multi-instance)
 
 local uci = require "luci.model.uci".cursor()
 local sys = require "luci.sys"
+local ntm = require "luci.model.network".init()
 
 local function split_time(value)
 	-- H:MM / HH:MM
@@ -18,7 +19,11 @@ end
 local scut = Map(
 	"scutclient",
 	translate("SCUT Client Settings"),
-	translate("Configure the SCUT Dr.com client. Save the settings before restarting the service.")
+	translate(
+		"Manage multiple authentication instances. Every instance binds one WAN "
+		.. "and runs its own process and log. Save the settings before "
+		.. "restarting the service."
+	)
 )
 
 
@@ -48,33 +53,59 @@ local enable = options:option(
 
 enable.rmempty = false
 enable.default = "0"
-
-
-local debug = options:option(
-	Flag,
-	"debug",
-	translate("Debug logging")
-)
-
-debug.default = "0"
-debug.description = translate(
-	"Enable verbose scutclient debug output. Disable it during normal use."
+enable.description = translate(
+	"Master switch of the scutclient service. Disabled instances never start."
 )
 
 
--- Account
+-- Authentication instances
 
-local client = scut:section(
+local instances = scut:section(
 	TypedSection,
 	"scutclient",
-	translate("Account")
+	translate("Authentication Instances"),
+	translate(
+		"The section name is the instance id used by the service, the status "
+		.. "page and the log file. One WAN can only be bound by one instance."
+	)
 )
 
-client.anonymous = true
-client.addremove = false
+instances.anonymous = false
+instances.addremove = true
 
 
-local username = client:option(
+instances:tab("basic", translate("Basic Settings"))
+instances:tab("drcom", translate("Dr.COM Settings"))
+instances:tab("advanced", translate("Advanced Settings"))
+instances:tab("logging", translate("Logging"))
+
+
+-- Basic
+
+local inst_enabled = instances:taboption(
+	"basic",
+	Flag,
+	"enabled",
+	translate("Enabled")
+)
+
+inst_enabled.rmempty = false
+inst_enabled.default = "1"
+
+
+local inst_name = instances:taboption(
+	"basic",
+	Value,
+	"name",
+	translate("Display name")
+)
+
+inst_name.rmempty = true
+inst_name.placeholder = "Wired WAN"
+
+
+local username = instances:taboption(
+	"basic",
 	Value,
 	"username",
 	translate("Username")
@@ -86,7 +117,8 @@ username.description = translate(
 )
 
 
-local password = client:option(
+local password = instances:taboption(
+	"basic",
 	Value,
 	"password",
 	translate("Password")
@@ -98,7 +130,8 @@ password.rmempty = false
 
 -- OpenWrt logical network interface
 
-local interface = client:option(
+local interface = instances:taboption(
+	"basic",
 	ListValue,
 	"interface",
 	translate("Authentication interface")
@@ -107,13 +140,49 @@ local interface = client:option(
 interface.default = "wan"
 interface.rmempty = false
 
+
+-- 收集已被其他实例占用的接口，用于展示与校验
+local used_by = {}
+
+uci:foreach("scutclient", "scutclient", function(s)
+	local ifc = s.interface
+	local name = s[".name"]
+
+	if ifc and ifc ~= "" and name then
+		used_by[ifc] = used_by[ifc] or name
+	end
+end)
+
+
 local found_wan = false
 
 uci:foreach("network", "interface", function(section)
 	local name = section[".name"]
 
 	if name and name ~= "" and name ~= "loopback" then
-		interface:value(name, name)
+		local title = name
+		local net = ntm:get_network(name)
+
+		if net then
+			local dev = net:get_interface()
+			local device = dev and dev:name()
+			local ipaddr = net:ipaddr()
+
+			if device and ipaddr then
+				title = name .. " (" .. device .. ", " .. ipaddr .. ")"
+			elseif device then
+				title = name .. " (" .. device .. ")"
+			end
+		end
+
+		if used_by[name] then
+			title = title
+				.. " ["
+				.. translatef("Used by %s", used_by[name])
+				.. "]"
+		end
+
+		interface:value(name, title)
 
 		if name == "wan" then
 			found_wan = true
@@ -127,23 +196,92 @@ end
 
 interface.description = translate(
 	"Logical OpenWrt network interface used for authentication. "
-	.. "The service resolves it to the actual network device automatically."
+	.. "The service resolves it to the actual network device automatically. "
+	.. "Each interface can only be bound by one instance."
+)
+
+interface.validate = function(self, value, section)
+	if value == nil or value == "" then
+		return nil, translate("Please select an interface.")
+	end
+
+	local conflict = nil
+
+	uci:foreach("scutclient", "scutclient", function(s)
+		if conflict then
+			return
+		end
+
+		local name = s[".name"]
+
+		if name and name ~= section and s.interface == value then
+			conflict = name
+		end
+	end)
+
+	if conflict then
+		return nil, translatef(
+			"Interface '%s' is already used by instance '%s'. "
+			.. "One WAN can only be bound by one instance.",
+			value,
+			conflict
+		)
+	end
+
+	return value
+end
+
+
+-- MAC management
+
+local mac_mode = instances:taboption(
+	"basic",
+	ListValue,
+	"mac_mode",
+	translate("MAC mode")
+)
+
+mac_mode.rmempty = false
+mac_mode.default = "keep"
+
+mac_mode:value("keep", translate("Keep the current interface MAC"))
+mac_mode:value("random", translate("Random MAC"))
+mac_mode:value("custom", translate("Custom MAC"))
+
+mac_mode.description = translate(
+	"Random MACs are generated once and stored with the instance."
 )
 
 
--- Dr.com settings
+local macaddr = instances:taboption(
+	"basic",
+	Value,
+	"macaddr",
+	translate("MAC address")
+)
 
-local drcom = scut:section(
-	TypedSection,
+macaddr.rmempty = true
+macaddr.datatype = "macaddr"
+macaddr.description = translate(
+	"Target MAC for random/custom mode. Leave empty in random mode to "
+	.. "generate one automatically on the first start."
+)
+
+
+local macgen = instances:taboption(
+	"basic",
+	DummyValue,
+	"_macgen"
+)
+
+macgen.rmempty = true
+macgen.template = "scutclient/mac_generator"
+
+
+-- Dr.COM
+
+local server = instances:taboption(
 	"drcom",
-	translate("Dr.com Settings")
-)
-
-drcom.anonymous = true
-drcom.addremove = false
-
-
-local server = drcom:option(
 	Value,
 	"server_auth_ip",
 	translate("Authentication server")
@@ -154,7 +292,8 @@ server.datatype = "ip4addr"
 server.default = "202.38.210.131"
 
 
-local dns = drcom:option(
+local dns = instances:taboption(
+	"drcom",
 	Value,
 	"dns",
 	translate("DNS server")
@@ -165,7 +304,8 @@ dns.datatype = "ip4addr"
 dns.default = "222.201.130.30"
 
 
-local version = drcom:option(
+local version = instances:taboption(
+	"drcom",
 	ListValue,
 	"version",
 	translate("Dr.com version")
@@ -191,7 +331,8 @@ version:value(
 version.default = "4472434f4d0096022a"
 
 
-local hash = drcom:option(
+local hash = instances:taboption(
+	"drcom",
 	ListValue,
 	"hash",
 	translate("DrAuthSvr.dll hash")
@@ -219,7 +360,8 @@ hash.default = "2ec15ad258aee9604b18f2f8114da38db16efd00"
 
 -- Allowed online time
 
-local nettime = drcom:option(
+local nettime = instances:taboption(
+	"drcom",
 	Value,
 	"nettime",
 	translate("Allowed online time")
@@ -255,7 +397,8 @@ end
 
 -- Hostname
 
-local hostname = drcom:option(
+local hostname = instances:taboption(
+	"drcom",
 	Value,
 	"hostname",
 	translate("Hostname sent to server")
@@ -281,6 +424,155 @@ if lease_hostname ~= "" then
 		lease_hostname
 	)
 end
+
+
+-- Advanced
+
+local heartbeat_interval = instances:taboption(
+	"advanced",
+	Value,
+	"heartbeat_interval",
+	translate("Heartbeat interval (seconds)")
+)
+
+heartbeat_interval.rmempty = true
+heartbeat_interval.placeholder = "12"
+heartbeat_interval.datatype = "and(uinteger,min(1),max(3600))"
+
+
+local heartbeat_timeout = instances:taboption(
+	"advanced",
+	Value,
+	"heartbeat_timeout",
+	translate("Heartbeat timeout (seconds)")
+)
+
+heartbeat_timeout.rmempty = true
+heartbeat_timeout.placeholder = "2"
+heartbeat_timeout.datatype = "and(uinteger,min(1),max(3600))"
+
+
+local eap_timeout = instances:taboption(
+	"advanced",
+	Value,
+	"eap_timeout",
+	translate("EAP receive timeout (seconds)")
+)
+
+eap_timeout.rmempty = true
+eap_timeout.placeholder = "1"
+eap_timeout.datatype = "and(uinteger,min(1),max(3600))"
+
+
+local eap_retries = instances:taboption(
+	"advanced",
+	Value,
+	"eap_retries",
+	translate("EAP retries")
+)
+
+eap_retries.rmempty = true
+eap_retries.placeholder = "3"
+eap_retries.datatype = "and(uinteger,min(1),max(100))"
+
+
+local onlinehook = instances:taboption(
+	"advanced",
+	Value,
+	"onlinehook",
+	translate("Online hook")
+)
+
+onlinehook.rmempty = true
+onlinehook.description = translate(
+	"Shell command executed after EAP authentication success. "
+	.. "Use with care."
+)
+
+
+local offlinehook = instances:taboption(
+	"advanced",
+	Value,
+	"offlinehook",
+	translate("Offline hook")
+)
+
+offlinehook.rmempty = true
+offlinehook.description = translate(
+	"Shell command executed when the client is forced offline. "
+	.. "Use with care."
+)
+
+
+-- Logging
+
+local log_level = instances:taboption(
+	"logging",
+	ListValue,
+	"log_level",
+	translate("Log level")
+)
+
+log_level.rmempty = false
+log_level.default = "info"
+
+log_level:value("error", "error")
+log_level:value("warn", "warn")
+log_level:value("info", "info")
+log_level:value("debug", "debug")
+log_level:value("trace", "trace")
+
+
+local log_size = instances:taboption(
+	"logging",
+	Value,
+	"log_size",
+	translate("Maximum log size (bytes)")
+)
+
+log_size.rmempty = true
+log_size.placeholder = "262144"
+log_size.datatype = "and(uinteger,min(1024))"
+
+
+local log_keep = instances:taboption(
+	"logging",
+	Value,
+	"log_keep",
+	translate("Log files to keep")
+)
+
+log_keep.rmempty = true
+log_keep.placeholder = "2"
+log_keep.datatype = "and(uinteger,min(1),max(9))"
+
+
+local log_system = instances:taboption(
+	"logging",
+	Flag,
+	"log_system",
+	translate("System log")
+)
+
+log_system.rmempty = false
+log_system.default = "1"
+log_system.description = translate(
+	"Mirror log output to the OpenWrt system log via procd."
+)
+
+
+local log_file = instances:taboption(
+	"logging",
+	Flag,
+	"log_file",
+	translate("Per-instance file log")
+)
+
+log_file.rmempty = false
+log_file.default = "1"
+log_file.description = translate(
+	"Write this instance's log to /tmp/scutclient/<instance>.log."
+)
 
 
 return scut

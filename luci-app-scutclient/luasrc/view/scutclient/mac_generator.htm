@@ -1,0 +1,42 @@
+<!-- Per-instance random MAC generator (DummyValue template) -->
+<div class="cbi-value" id="<%=self.option%>-<%=section or ''%>">
+	<button type="button" class="cbi-button cbi-button-apply" onclick="scutGenerateMac(this); return false;">
+		<%:Generate random MAC%>
+	</button>
+</div>
+
+<script type="text/javascript">
+// LuCI 多实例下每个 section 都渲染一份按钮；
+// 通过最近的 cbi-section 容器定位本实例的 macaddr 输入框。
+if (typeof scutGenerateMac === 'undefined') {
+	window.scutGenerateMac = function(btn) {
+		var scope = btn.closest('.cbi-section') || document;
+		var input = scope.querySelector('input[id$=".macaddr"]');
+
+		if (!input) {
+			return;
+		}
+
+		var b = new Array(6);
+		var i;
+
+		for (i = 0; i < 6; i++) {
+			b[i] = Math.floor(Math.random() * 256);
+		}
+
+		// Locally administered (bit1=1) and unicast (bit0=0)
+		b[0] = (b[0] & 0xFC) | 0x02;
+
+		var hex = function(n) {
+			return (n < 16 ? '0' : '') + n.toString(16).toUpperCase();
+		};
+
+		var parts = new Array(6);
+		for (i = 0; i < 6; i++) {
+			parts[i] = hex(b[i]);
+		}
+
+		input.value = parts.join(':');
+	};
+}
+</script>

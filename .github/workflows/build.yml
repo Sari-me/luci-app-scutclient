@@ -291,6 +291,11 @@ jobs:
             .ci-feed/scutclient/files/scutclient.hotplug
 
 
+          cp \
+            .scutclient-core/openwrt/files/scutclient-mac \
+            .ci-feed/scutclient/files/scutclient-mac
+
+
 
           echo "======================================"
           echo "Validate scutclient"
@@ -316,6 +321,9 @@ jobs:
 
           test -f \
             .ci-feed/scutclient/files/scutclient.hotplug
+
+          test -f \
+            .ci-feed/scutclient/files/scutclient-mac
 
 
           grep -q \
