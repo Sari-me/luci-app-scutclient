@@ -196,10 +196,26 @@ if (typeof scutProbeInit === 'undefined') {
 
 	// 事件委托：interface / auth_method 变化时刷新全部按钮状态
 	document.addEventListener('change', function(e) {
-		if (e.target && e.target.id && e.target.id.indexOf('cbid.') === 0 &&
-			(e.target.matches('select[id$=".interface"]') ||
-			 e.target.matches('select[id$=".auth_method"]'))) {
-			scutProbeRefreshAll();
+		if (!e.target || !e.target.id || e.target.id.indexOf('cbid.') !== 0 ||
+			(!e.target.matches('select[id$=".interface"]') &&
+			 !e.target.matches('select[id$=".auth_method"]'))) {
+			return;
+		}
+
+		scutProbeRefreshAll();
+
+		// WAN 变更后旧 Location 视为未验证（保留文本，不自动清空）
+		if (e.target.matches('select[id$=".interface"]')) {
+			var buttons = document.querySelectorAll('button.scut-portal-probe-btn');
+
+			Array.prototype.forEach.call(buttons, function(btn) {
+				var ctx = scutProbeContext(btn);
+
+				if (ctx && ctx.iface === e.target &&
+					ctx.location && ctx.location.value) {
+					scutProbeStatus(btn, window.scutProbeL.stale, 'scut-warn');
+				}
+			});
 		}
 	});
 
