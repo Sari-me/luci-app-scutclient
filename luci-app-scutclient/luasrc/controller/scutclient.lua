@@ -217,11 +217,6 @@ function index()
 		call("action_api_status")
 	).leaf = true
 
-	entry(
-		{"admin", "services", "scutclient", "api_netstat"},
-		call("action_api_netstat")
-	).leaf = true
-
 	-- 使用 LuCI 的 post() target，自动要求 POST 并校验 token。
 	entry(
 		{"admin", "services", "scutclient", "api_service"},
@@ -337,24 +332,6 @@ function action_api_status()
 		version = get_package_version(),
 		instances = instances
 	})
-end
-
-function action_api_netstat()
-	local output = trim(sys.exec(
-		"wget -q -T 3 -O- http://whatismyip.akamai.com 2>/dev/null | head -n 1"
-	))
-
-	local state = "unknown"
-
-	if output == "" then
-		state = "no_internet"
-	elseif output:match("^%d+%.%d+%.%d+%.%d+$") then
-		state = "internet"
-	else
-		state = "no_login"
-	end
-
-	json_response({ stat = state })
 end
 
 function action_api_service()
