@@ -27,12 +27,6 @@ local scut = Map(
 )
 
 
--- Quick links
-
-local guide = scut:section(SimpleSection)
-guide.template = "scutclient/quicklinks"
-
-
 -- Real-time WAN lock (front-end UX only; the init script re-checks
 -- logical + netdev exclusivity on start)
 
