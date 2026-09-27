@@ -45,9 +45,6 @@ msgstr "配置节名称即实例 ID,用于服务、状态页和日志文件。�
 msgid "Basic Settings"
 msgstr "基本设置"
 
-msgid "Dr.COM Settings"
-msgstr "Dr.COM 设置"
-
 msgid "Advanced Settings"
 msgstr "高级设置"
 
@@ -60,6 +57,18 @@ msgstr "已启用"
 
 msgid "Display name"
 msgstr "显示名称"
+
+msgid "Authentication method"
+msgstr "认证方式"
+
+msgid "802.1X + Dr.COM"
+msgstr "802.1X + Dr.COM"
+
+msgid "Web Portal / Wireless authentication"
+msgstr "Web Portal / 无线认证"
+
+msgid "802.1X uses EAPOL and the Dr.COM UDP protocol. Web Portal detects the captive portal Location on the selected WAN and logs in through it."
+msgstr "802.1X 使用 EAPOL 与 Dr.COM UDP 协议。Web Portal 会在所选 WAN 上探测 Captive Portal 的 Location 并通过它登录。"
 
 msgid "Username"
 msgstr "用户名"
@@ -108,6 +117,71 @@ msgstr "随机/自定义模式使用的目标 MAC。随机模式下留空则首�
 
 msgid "Generate random MAC"
 msgstr "生成随机 MAC"
+
+# ---------- Portal Location ----------
+msgid "Location"
+msgstr "Location(跳转地址)"
+
+msgid "Captive portal redirect URL. Select an authentication interface and use the test button to detect it automatically, or enter it manually. Re-test after the WAN or MAC configuration changes."
+msgstr "Captive Portal 跳转地址。选择认证接口后点击测试按钮自动探测,或手动填写。WAN 或 MAC 配置变更后请重新测试。"
+
+msgid "Location is too long."
+msgstr "Location 过长。"
+
+msgid "Location must start with http:// or https://."
+msgstr "Location 必须以 http:// 或 https:// 开头。"
+
+msgid "Send test request / Detect Location"
+msgstr "发送测试请求 / 探测 Location"
+
+msgid "Testing…"
+msgstr "测试中…"
+
+msgid "Location detected"
+msgstr "探测成功"
+
+msgid "No redirect detected"
+msgstr "未检测到重定向"
+
+msgid "HTTP response without Location"
+msgstr "HTTP 响应未包含 Location"
+
+msgid "Interface is not ready."
+msgstr "接口未就绪。"
+
+msgid "Probe failed."
+msgstr "探测失败。"
+
+msgid "Interface changed. Test Location again."
+msgstr "接口已变更,请重新探测 Location。"
+
+# ---------- Web Portal Tab ----------
+msgid "Web Portal"
+msgstr "Web Portal"
+
+msgid "Portal protocol"
+msgstr "Portal 协议"
+
+msgid "Service type"
+msgstr "服务类型"
+
+msgid "Account suffix"
+msgstr "账号后缀"
+
+msgid "Connect timeout (seconds)"
+msgstr "连接超时(秒)"
+
+msgid "Request timeout (seconds)"
+msgstr "请求超时(秒)"
+
+msgid "Online check interval (seconds)"
+msgstr "在线检测间隔(秒)"
+
+msgid "Verify TLS certificates"
+msgstr "校验 TLS 证书"
+
+msgid "Validate https:// portal certificates against the system CA bundle."
+msgstr "对 https:// Portal 使用系统 CA 校验证书。"
 
 # ---------- Dr.COM Tab ----------
 msgid "Authentication server"

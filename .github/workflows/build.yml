@@ -296,6 +296,11 @@ jobs:
             .ci-feed/scutclient/files/scutclient-mac
 
 
+          cp \
+            .scutclient-core/openwrt/files/scutclient-portal-probe \
+            .ci-feed/scutclient/files/scutclient-portal-probe
+
+
 
           echo "======================================"
           echo "Validate scutclient"
@@ -325,6 +330,9 @@ jobs:
           test -f \
             .ci-feed/scutclient/files/scutclient-mac
 
+          test -f \
+            .ci-feed/scutclient/files/scutclient-portal-probe
+
 
           grep -q \
             '^PKG_NAME:=scutclient$' \
@@ -352,20 +360,24 @@ jobs:
           # init 传给 C 程序的 CLI 必须真实存在于克隆的后端 main.c
           for opt in instance expected-mac heartbeat-interval \
                      heartbeat-timeout eap-timeout eap-retries \
-                     log-level log-file log-max-size log-keep; do
+                     log-level log-file log-max-size log-keep \
+                     auth-method portal-location; do
             grep -q -- "\"$opt\"" .scutclient-core/src/main.c || {
               echo "Missing CLI option: --$opt"
               exit 1
             }
           done
 
-          # MAC helper 必须在源仓库与 CI feed 中同时存在
+          # MAC / portal probe helper 必须在源仓库与 CI feed 中同时存在
           test -f .scutclient-core/openwrt/files/scutclient-mac
           test -f .ci-feed/scutclient/files/scutclient-mac
+          test -f .scutclient-core/openwrt/files/scutclient-portal-probe
+          test -f .ci-feed/scutclient/files/scutclient-portal-probe
 
           sh -n .ci-feed/scutclient/files/scutclient.init
           sh -n .ci-feed/scutclient/files/scutclient.hotplug
           sh -n .ci-feed/scutclient/files/scutclient-mac
+          sh -n .ci-feed/scutclient/files/scutclient-portal-probe
 
       - name: Build scutclient and LuCI package
         uses: openwrt/gh-action-sdk@main

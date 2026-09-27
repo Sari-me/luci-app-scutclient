@@ -41,7 +41,16 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 - **Settings**:实例增删改。配置节名称即实例 ID;接口下拉框会标注已被其他实例占用的 WAN 并拒绝重复绑定。每个实例分四个标签页:Basic(账号/接口/MAC)、Dr.COM、Advanced(心跳/EAP 参数与钩子)、Logging。
 - **Logs**:按实例查看 `/tmp/scutclient/<实例>.log`,支持等级过滤、行数选择、自动刷新、清空与下载。
 - MAC 模式(keep/random/custom)由后端 `/usr/lib/scutclient/scutclient-mac` 持久化并应用到有线设备或无线 STA 接口,认证进程通过 `--expected-mac` 校验是否生效。
-- 旧版单账号配置(全局 `drcom` 节)会在服务启动时自动迁移为实例 `default`,并写入 `option.main.config_version='2'` 防止重复迁移。
+- **Web Portal 认证(实验性)**:实例的认证方式可选 `802.1X + Dr.COM`(默认)或 `Web Portal / Wireless authentication`。Portal 模式在 Basic 页选择 WAN 后,点击 **发送测试请求 / 探测 Location**,后端会把 `generate_204` 探测绑定到该 WAN 的真实网卡(不跟随重定向),拿到 30x 的 Location 自动填入当前实例(不自动保存,仍需 Save & Apply);204 表示该 WAN 已可直连,200 无 Location 或失败时给出对应提示。新建实例未保存也可探测;接口变更后旧 Location 会标记为待重测。注意:Portal 登录的 C 后端尚未实现,当前版本启动 portal 实例会明确报错退出。
+- 旧版单账号配置(全局 `drcom` 节)会在服务启动时自动迁移为实例 `default`,并写入 `option.main.config_version='3'` 防止重复迁移。
+
+## Portal Location 探测回归测试用例
+
+1. **按钮状态**:portal 实例未选 WAN 时按钮禁用;选择 WAN 立即可点;清空 WAN 再次禁用。
+2. **未保存可探测**:新建实例只在表单选择 WAN、不点保存,探测必须成功(不依赖 UCI 已保存值)。
+3. **多实例隔离**:三个实例各自点探测,只修改各自实例的 Location 输入框。
+4. **真实设备**:返回 JSON 中 `device` 必须是 netifd 解析出的真实网卡(如 `wwan -> MT7981_1.network2` 或 `apcli0`),curl 实际绑定该设备。
+5. **204 / 302 / 接口 down / 注入**:`204` 提示无重定向且不清空已填 Location;未认证 `302` 自动填入;接口不存在提示"接口未就绪";`interface=wwan;reboot` 必须返回 400,不进入 shell。
 
 ## 状态页回归测试用例
 
