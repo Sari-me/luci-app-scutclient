@@ -1,0 +1,188 @@
+<!-- Per-instance portal Location probe (DummyValue template).
+     The button carries the exact UCI section id and reads/writes this
+     instance's fields by their full cbid - it can never touch another
+     instance. Shown only when auth_method=portal (CBI depends). -->
+<div class="cbi-value" id="<%=self.option%>-<%=section or ''%>">
+	<button type="button"
+		class="cbi-button cbi-button-apply scut-portal-probe-btn"
+		data-scut-section="<%=section or ''%>"
+		disabled
+		onclick="scutProbeLocation(this); return false;">
+		<%:Send test request / Detect Location%>
+	</button>
+	<span class="scut-portal-probe-status"
+		data-scut-section="<%=section or ''%>"></span>
+</div>
+
+<script type="text/javascript">
+	// 共享配置：多个实例各渲染一份模板，这里保证只初始化一次
+	window.scutProbeUrl = window.scutProbeUrl ||
+		'<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_portal_probe")%>';
+	window.scutProbeToken = window.scutProbeToken || '<%=token%>';
+	window.scutProbeL = window.scutProbeL || {
+		normal: '<%:Send test request / Detect Location%>',
+		testing: '<%:Testing…%>',
+		detected: '<%:Location detected%>',
+		noRedirect: '<%:No redirect detected%>',
+		noLocation: '<%:HTTP response without Location%>',
+		notReady: '<%:Interface is not ready.%>',
+		failed: '<%:Probe failed.%>',
+		stale: '<%:Interface changed. Test Location again.%>'
+	};
+</script>
+
+<script type="text/javascript">
+if (typeof scutProbeInit === 'undefined') {
+	window.scutProbeInit = true;
+
+	window.scutProbeField = function(section, option) {
+		return document.getElementById(
+			'cbid.scutclient.' + section + '.' + option
+		);
+	};
+
+	window.scutProbeRefresh = function(btn) {
+		var sid = btn.getAttribute('data-scut-section');
+		var method = scutProbeField(sid, 'auth_method');
+		var iface = scutProbeField(sid, 'interface');
+
+		// portal 模式且已选择 WAN 才可点击
+		btn.disabled = !(
+			method && method.value === 'portal' &&
+			iface && iface.value !== ''
+		);
+	};
+
+	window.scutProbeStatus = function(sid, html, cls) {
+		var nodes = document.querySelectorAll(
+			'span.scut-portal-probe-status[data-scut-section="' + sid + '"]'
+		);
+
+		Array.prototype.forEach.call(nodes, function(node) {
+			node.innerHTML = html;
+			node.className = 'scut-portal-probe-status ' + (cls || '');
+		});
+	};
+
+	window.scutProbeLocation = function(btn) {
+		var sid = btn.getAttribute('data-scut-section');
+		var iface = scutProbeField(sid, 'interface');
+		var location = scutProbeField(sid, 'portal_location');
+
+		if (!iface || !iface.value || btn.disabled) {
+			return;
+		}
+
+		btn.disabled = true;
+		btn.textContent = scutProbeL.testing;
+
+		var xhr = new XMLHttpRequest();
+		xhr.open('POST', window.scutProbeUrl, true);
+		xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== 4) {
+				return;
+			}
+
+			var data = null;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch (e) {
+				data = null;
+			}
+
+			var esc = function(v) {
+				var n = document.createElement('span');
+				n.textContent = v === undefined || v === null ? '' : String(v);
+				return n.innerHTML;
+			};
+
+			if (xhr.status >= 200 && xhr.status < 300 && data) {
+				if (data.success && data.location) {
+					// 只填当前实例，不自动保存
+					if (location) {
+						location.value = data.location;
+						location.dispatchEvent(
+							new Event('change', { bubbles: true })
+						);
+					}
+					scutProbeStatus(
+						sid,
+						scutProbeL.detected + ': ' +
+						esc(data.interface) + ' -> ' + esc(data.device) +
+						' · HTTP ' + esc(data.http_code),
+						'scut-good'
+					);
+				} else if (data.reason === 'no_redirect') {
+					scutProbeStatus(
+						sid,
+						scutProbeL.noRedirect + ' (HTTP ' + esc(data.http_code) + ')',
+						'scut-warn'
+					);
+				} else if (data.reason === 'no_location') {
+					scutProbeStatus(
+						sid,
+						scutProbeL.noLocation + ' (HTTP ' + esc(data.http_code) + ')',
+						'scut-warn'
+					);
+				} else if (data.reason === 'interface_not_ready') {
+					scutProbeStatus(sid, scutProbeL.notReady, 'scut-bad');
+				} else {
+					scutProbeStatus(sid, scutProbeL.failed, 'scut-bad');
+				}
+			} else {
+				scutProbeStatus(sid, scutProbeL.failed, 'scut-bad');
+			}
+
+			btn.textContent = scutProbeL.normal;
+			scutProbeRefresh(btn);
+		};
+		xhr.send(
+			'token=' + encodeURIComponent(window.scutProbeToken) +
+			'&interface=' + encodeURIComponent(iface.value)
+		);
+	};
+
+	window.scutProbeBind = function() {
+		var buttons = document.querySelectorAll(
+			'button.scut-portal-probe-btn[data-scut-section]'
+		);
+
+		Array.prototype.forEach.call(buttons, function(btn) {
+			var sid = btn.getAttribute('data-scut-section');
+			var method = scutProbeField(sid, 'auth_method');
+			var iface = scutProbeField(sid, 'interface');
+
+			if (method && !method.dataset.scutProbe) {
+				method.dataset.scutProbe = "1";
+				method.addEventListener('change', function() {
+					scutProbeRefresh(btn);
+				});
+			}
+
+			if (iface && !iface.dataset.scutProbe) {
+				iface.dataset.scutProbe = "1";
+				iface.addEventListener('change', function() {
+					scutProbeRefresh(btn);
+
+					// WAN 变更后旧 Location 视为未验证（不自动清除）
+					var location = scutProbeField(sid, 'portal_location');
+					if (location && location.value) {
+						scutProbeStatus(sid, scutProbeL.stale, 'scut-warn');
+					} else {
+						scutProbeStatus(sid, '', '');
+					}
+				});
+			}
+
+			scutProbeRefresh(btn);
+		});
+	};
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', scutProbeBind);
+	} else {
+		scutProbeBind();
+	}
+}
+</script>
