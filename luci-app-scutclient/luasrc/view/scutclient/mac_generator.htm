@@ -1,10 +1,10 @@
 <!-- Per-instance random MAC generator (DummyValue template).
-     The button carries the exact UCI section id and addresses the
-     instance's inputs by their full cbid, so it can never touch
-     another instance's fields. -->
+     Field lookup is scoped to the current .cbi-section-node (the
+     per-instance container rendered by TypedSection), so the button can
+     never modify another instance's fields and does not depend on any
+     cbid scheme. -->
 <div class="cbi-value" id="<%=self.option%>-<%=section or ''%>">
 	<button type="button" class="cbi-button cbi-button-apply"
-		data-scut-section="<%=section or ''%>"
 		onclick="scutGenerateMac(this); return false;">
 		<%:Generate random MAC%>
 	</button>
@@ -13,18 +13,17 @@
 <script type="text/javascript">
 if (typeof scutGenerateMac === 'undefined') {
 	window.scutGenerateMac = function(btn) {
-		var sid = btn.getAttribute('data-scut-section');
+		var node = btn.closest
+			? btn.closest('.cbi-section-node')
+			: null;
 
-		if (!sid) {
+		if (!node) {
 			return;
 		}
 
-		var input = document.getElementById(
-			'cbid.scutclient.' + sid + '.macaddr'
-		);
-		var mode = document.getElementById(
-			'cbid.scutclient.' + sid + '.mac_mode'
-		);
+		// 只在当前实例容器内查找，不会影响其他实例
+		var input = node.querySelector('input[id$=".macaddr"]');
+		var mode = node.querySelector('select[id$=".mac_mode"]');
 
 		if (!input) {
 			return;
@@ -33,9 +32,7 @@ if (typeof scutGenerateMac === 'undefined') {
 		// MAC 在页面内跨实例唯一
 		var used = {};
 		Array.prototype.forEach.call(
-			document.querySelectorAll(
-				'input[id^="cbid.scutclient."][id$=".macaddr"]'
-			),
+			document.querySelectorAll('input[id$=".macaddr"]'),
 			function(other) {
 				if (other !== input && other.value) {
 					used[other.value.toUpperCase()] = true;
