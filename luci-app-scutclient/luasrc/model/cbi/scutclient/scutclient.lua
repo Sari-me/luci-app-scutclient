@@ -514,7 +514,7 @@ route_isolation:value("native", translate("Native binding only"))
 route_isolation:value("mwan3", translate("Force mwan3 isolation"))
 
 route_isolation.description = translate(
-	"When mwan3 is running, Auto applies its bypass mark to Dr.COM UDP "
+	"When mwan3 is running, Auto routes Dr.COM UDP through its WAN table "
 	.. "and launches Portal through 'mwan3 use'. Native uses the daemon "
 	.. "bindings only."
 )
