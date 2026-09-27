@@ -659,11 +659,21 @@ local portal_protocol = instances:taboption(
 )
 
 portal_protocol.rmempty = true
-portal_protocol.default = "eportal"
+portal_protocol.default = "auto"
 portal_protocol:depends("auth_method", "portal")
 
+portal_protocol:value(
+	"auto",
+	translate("Auto (prefer Dr.COM Web)")
+)
 portal_protocol:value("eportal", "ePortal")
 portal_protocol:value("drcom", "Dr.COM Web")
+
+portal_protocol.description = translate(
+	"Auto uses the Dr.COM Web login endpoint detected with the Location, "
+	.. "which works even when the ePortal ports are unreachable. Select "
+	.. "a backend manually only if your campus network requires it."
+)
 
 
 local portal_suffix = instances:taboption(
@@ -768,6 +778,61 @@ portal_https_port:depends("auth_method", "portal")
 portal_https_port.description = translate(
 	"ePortal login port used when the Location is https://. "
 	.. "Leave empty to use the protocol default."
+)
+
+
+local portal_program_index = instances:taboption(
+	"portal",
+	Value,
+	"portal_program_index",
+	translate("Program index override")
+)
+
+portal_program_index.rmempty = true
+portal_program_index:depends("auth_method", "portal")
+portal_program_index.description = translate(
+	"Optional. Program index of the Dr.COM Web login page. "
+	.. "Leave empty unless the campus portal requires a specific value."
+)
+
+
+local portal_page_index = instances:taboption(
+	"portal",
+	Value,
+	"portal_page_index",
+	translate("Page index override")
+)
+
+portal_page_index.rmempty = true
+portal_page_index.placeholder = "0"
+portal_page_index.datatype = "uinteger"
+portal_page_index:depends("auth_method", "portal")
+
+
+local portal_js_version = instances:taboption(
+	"portal",
+	Value,
+	"portal_js_version",
+	translate("JS version override")
+)
+
+portal_js_version.rmempty = true
+portal_js_version.placeholder = "4.1.3"
+portal_js_version:depends("auth_method", "portal")
+
+
+local portal_r3 = instances:taboption(
+	"portal",
+	Value,
+	"portal_r3",
+	translate("R3 override")
+)
+
+portal_r3.rmempty = true
+portal_r3:depends("auth_method", "portal")
+portal_r3.description = translate(
+	"Optional Dr.COM Web R3 value. Only needed when the campus portal "
+	.. "uses the carrier selection mode (enable_r3)."
 )
 
 

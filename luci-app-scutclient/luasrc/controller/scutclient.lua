@@ -240,20 +240,34 @@ local function valid_logical_interface(name)
 	return found
 end
 
-local function resolve_runtime_device(interface)
+-- 解析 logical WAN 的真实 netdev 与源 IPv4（无线设备名绑定间歇性
+-- 失败，HTTP 探测优先按源 IPv4 绑定）。
+local function resolve_runtime_network(interface)
 	local dump = get_network_dump()
 
 	if type(dump) ~= "table" then
-		return nil
+		return nil, nil
 	end
 
 	for _, net in ipairs(dump) do
 		if net.interface == interface then
-			return net.l3_device or net.device
+			local device = net.l3_device or net.device
+			local ipv4 = ""
+
+			if type(net["ipv4-address"]) == "table"
+				and type(net["ipv4-address"][1]) == "table"
+				and type(net["ipv4-address"][1].address) == "string"
+				and net["ipv4-address"][1].address
+					:match("^%d+%.%d+%.%d+%.%d+$")
+			then
+				ipv4 = net["ipv4-address"][1].address
+			end
+
+			return device, ipv4
 		end
 	end
 
-	return nil
+	return nil, nil
 end
 
 function index()
@@ -458,11 +472,12 @@ function action_api_portal_probe()
 		})
 	end
 
-	local device = resolve_runtime_device(interface)
+	local device, source_ip = resolve_runtime_network(interface)
 
 	if not device
 		or device == ""
 		or not device:match("^[%w_.:%-]+$")
+		or source_ip == ""
 	then
 		return json_response({
 			success = false,
@@ -473,7 +488,8 @@ function action_api_portal_probe()
 
 	local output = trim(sys.exec(
 		"/usr/lib/scutclient/scutclient-portal-probe " ..
-		util.shellquote(device) .. " 2>/dev/null"
+		util.shellquote(device) .. " " ..
+		util.shellquote(source_ip) .. " 2>/dev/null"
 	))
 
 	local http_code = tonumber(output:match("http_code=(%d+)"))

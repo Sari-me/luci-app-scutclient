@@ -160,7 +160,31 @@ msgid "Web Portal"
 msgstr "Web Portal"
 
 msgid "Portal protocol"
-msgstr "Portal 协议"
+msgstr "Portal 认证方式"
+
+msgid "Auto (prefer Dr.COM Web)"
+msgstr "自动(优先 Dr.COM Web)"
+
+msgid "Auto uses the Dr.COM Web login endpoint detected with the Location, which works even when the ePortal ports are unreachable. Select a backend manually only if your campus network requires it."
+msgstr "自动模式使用随 Location 探测到的 Dr.COM Web 登录接口,即使 ePortal 端口不可达也能登录。仅当校园网明确需要时才手动指定后端。"
+
+msgid "Program index override"
+msgstr "Program index 覆盖"
+
+msgid "Optional. Program index of the Dr.COM Web login page. Leave empty unless the campus portal requires a specific value."
+msgstr "可选。Dr.COM Web 登录页的 program index。除非校园门户要求特定值,否则请留空。"
+
+msgid "Page index override"
+msgstr "Page index 覆盖"
+
+msgid "JS version override"
+msgstr "JS 版本覆盖"
+
+msgid "R3 override"
+msgstr "R3 覆盖"
+
+msgid "Optional Dr.COM Web R3 value. Only needed when the campus portal uses the carrier selection mode (enable_r3)."
+msgstr "可选的 Dr.COM Web R3 值。仅当校园门户使用运营商选择模式(enable_r3)时需要。"
 
 msgid "Account suffix"
 msgstr "账号后缀"
