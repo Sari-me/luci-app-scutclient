@@ -1,20 +1,61 @@
 <%+header%>
 
+<%-
+	local uci = require "luci.model.uci".cursor()
+	local instances = {}
+
+	local function esc(value)
+		return (tostring(value or ""):gsub("[<>&\"]", {
+			["<"] = "&lt;",
+			[">"] = "&gt;",
+			["&"] = "&amp;",
+			['"'] = "&quot;"
+		}))
+	end
+
+	uci:foreach("scutclient", "scutclient", function(s)
+		instances[#instances + 1] = {
+			id = s[".name"],
+			name = s.name or s[".name"]
+		}
+	end)
+
+	local selected = luci.http.formvalue("instance") or ""
+	local have_selected = false
+
+	for _, inst in ipairs(instances) do
+		if inst.id == selected then
+			have_selected = true
+			break
+		end
+	end
+
+	if not have_selected and instances[1] then
+		selected = instances[1].id
+	end
+-%>
+
 <style type="text/css">
-.scut-log-actions {
+.scut-log-controls {
 	display: flex;
 	flex-wrap: wrap;
-	gap: .5rem;
-	margin: .75rem 0;
+	align-items: center;
+	gap: .75rem;
+	margin: 1rem 0;
+}
+
+.scut-log-controls label {
+	font-weight: 600;
 }
 
 #scut-log {
 	width: 100%;
-	min-height: 420px;
+	min-height: 24rem;
 	box-sizing: border-box;
 	font-family: monospace;
 	font-size: 12px;
 	line-height: 1.45;
+	white-space: pre;
 	resize: vertical;
 }
 </style>
@@ -22,60 +63,186 @@
 <h2><%:SCUT Client Logs%></h2>
 
 <div class="cbi-map-descr">
-	<%:The latest 200 lines are refreshed automatically. The download contains only the scutclient log and does not include UCI configuration or account passwords.%>
+	<%:Per-instance log files under /tmp/scutclient. Only tail lines are shown; use Download for the full file.%>
 </div>
 
-<div class="scut-log-actions">
-	<button class="cbi-button cbi-button-action" type="button" onclick="loadLog(true)">
-		<%:Refresh%>
-	</button>
+<% if #instances == 0 then %>
+	<div class="cbi-map-descr">
+		<%:No instances configured. Add one on the Settings page.%>
+	</div>
+<% else %>
+	<div class="scut-log-controls">
+		<label for="scut-instance"><%:Instance%>:</label>
+		<select id="scut-instance" class="cbi-input-select">
+			<% for _, inst in ipairs(instances) do %>
+				<option value="<%=esc(inst.id)%>"<% if inst.id == selected then %> selected<% end %>>
+					<%=esc(inst.name)%> (<%=esc(inst.id)%>)
+				</option>
+			<% end %>
+		</select>
 
-	<a class="cbi-button cbi-button-apply"
-	   href="<%=luci.dispatcher.build_url('admin', 'services', 'scutclient', 'scutclient.log')%>">
-		<%:Download log%>
-	</a>
-</div>
+		<label for="scut-level"><%:Level%>:</label>
+		<select id="scut-level" class="cbi-input-select">
+			<option value="all" selected><%:All%></option>
+			<option value="ERROR">error</option>
+			<option value="WARN">warn</option>
+			<option value="INFO">info</option>
+			<option value="DEBUG">debug</option>
+			<option value="TRACE">trace</option>
+		</select>
 
-<textarea id="scut-log" readonly="readonly" wrap="off"><%:Loading…%></textarea>
+		<label for="scut-lines"><%:Lines%>:</label>
+		<input type="number" id="scut-lines" class="cbi-input-text"
+			min="10" max="2000" value="200" />
 
-<script type="text/javascript">
-(function() {
-	var logUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "get_log")%>';
-	var timer = null;
+		<label>
+			<input type="checkbox" id="scut-autorefresh" checked />
+			<%:Auto Refresh%>
+		</label>
 
-	window.loadLog = function(forceScroll) {
-		var box = document.getElementById('scut-log');
-		var xhr = new XMLHttpRequest();
+		<button type="button" class="cbi-button cbi-button-apply" onclick="scutLoadLog(true)">
+			<%:Refresh%>
+		</button>
+		<button type="button" class="cbi-button cbi-button-negative" onclick="scutClearLog()">
+			<%:Clear%>
+		</button>
+		<button type="button" class="cbi-button" onclick="scutDownloadLog()">
+			<%:Download%>
+		</button>
+	</div>
 
-		if (!box) {
-			return;
+	<textarea id="scut-log" readonly="readonly" wrap="off"><%:Loading…%></textarea>
+
+	<script type="text/javascript">
+	(function() {
+		var apiLogUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_log")%>';
+		var apiClearUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_log_clear")%>';
+		var apiDownloadUrl = '<%=luci.dispatcher.build_url("admin", "services", "scutclient", "api_log_download")%>';
+		var csrfToken = '<%=token%>';
+
+		var L = {
+			unavailable: '<%:No scutclient log is available.%>',
+			confirmClear: '<%:Clear this instance log?%>',
+			failed: '<%:Operation failed.%>'
+		};
+
+		function byId(id) {
+			return document.getElementById(id);
 		}
 
-		var nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 40;
+		function currentInstance() {
+			return byId('scut-instance').value || '';
+		}
 
-		xhr.open('GET', logUrl, true);
-		xhr.onreadystatechange = function() {
-			if (xhr.readyState !== 4) {
+		function currentLines() {
+			var lines = parseInt(byId('scut-lines').value, 10);
+
+			if (isNaN(lines) || lines < 10) {
+				lines = 10;
+			} else if (lines > 2000) {
+				lines = 2000;
+			}
+
+			return lines;
+		}
+
+		function currentLevel() {
+			return byId('scut-level').value || 'all';
+		}
+
+		function filterByLevel(text) {
+			var level = currentLevel();
+
+			if (level === 'all') {
+				return text;
+			}
+
+			var keep = [];
+			var lines = text.split('\n');
+			var tag = '[' + level + ']';
+
+			for (var i = 0; i < lines.length; i++) {
+				if (lines[i].indexOf(tag) !== -1) {
+					keep.push(lines[i]);
+				}
+			}
+
+			return keep.join('\n');
+		}
+
+		window.scutLoadLog = function(force) {
+			var box = byId('scut-log');
+			var nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 40;
+
+			var url = apiLogUrl +
+				'?instance=' + encodeURIComponent(currentInstance()) +
+				'&lines=' + currentLines();
+
+			var xhr = new XMLHttpRequest();
+			xhr.open('GET', url, true);
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState !== 4) {
+					return;
+				}
+
+				if (xhr.status >= 200 && xhr.status < 300) {
+					var content = filterByLevel(xhr.responseText);
+					if (content === '') {
+						content = L.unavailable;
+					}
+					box.value = content;
+					if (force || nearBottom) {
+						box.scrollTop = box.scrollHeight;
+					}
+				} else {
+					box.value = L.failed;
+				}
+			};
+			xhr.send(null);
+		};
+
+		window.scutClearLog = function() {
+			if (!window.confirm(L.confirmClear)) {
 				return;
 			}
 
-			if (xhr.status >= 200 && xhr.status < 300) {
-				box.value = xhr.responseText || '';
-				if (forceScroll || nearBottom) {
-					box.scrollTop = box.scrollHeight;
+			var xhr = new XMLHttpRequest();
+			xhr.open('POST', apiClearUrl, true);
+			xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState !== 4) {
+					return;
 				}
-			} else {
-				box.value = '<%:Unable to load log.%>';
-			}
+				scutLoadLog(true);
+			};
+			xhr.send(
+				'token=' + encodeURIComponent(csrfToken) +
+				'&instance=' + encodeURIComponent(currentInstance())
+			);
 		};
-		xhr.send(null);
-	};
 
-	window.loadLog(true);
-	timer = window.setInterval(function() {
-		window.loadLog(false);
-	}, 3000);
-})();
-</script>
+		window.scutDownloadLog = function() {
+			window.location = apiDownloadUrl +
+				'?instance=' + encodeURIComponent(currentInstance());
+		};
+
+		byId('scut-instance').addEventListener('change', function() {
+			scutLoadLog(true);
+		});
+
+		byId('scut-level').addEventListener('change', function() {
+			scutLoadLog(true);
+		});
+
+		window.setInterval(function() {
+			if (byId('scut-autorefresh').checked) {
+				scutLoadLog(false);
+			}
+		}, 3000);
+
+		scutLoadLog(true);
+	})();
+	</script>
+<% end %>
 
 <%+footer%>
