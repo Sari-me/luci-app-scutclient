@@ -337,6 +337,20 @@
 				: '<span class="scut-muted">-</span>');
 
 		h += row(L.server, dash(inst.server));
+
+		if (inst.portal_backend) {
+			h += row('<%:Portal backend%>',
+				esc(inst.portal_backend === 'eportal' ? 'ePortal' :
+					inst.portal_backend === 'drcom' ? 'Dr.COM Web' :
+					inst.portal_backend));
+		}
+
+		if (inst.route_isolation) {
+			h += row('<%:Routing isolation%>',
+				esc(inst.route_isolation) + ' · ' +
+				'<%:Source IPv4%>: ' + dash(inst.source_ipv4));
+		}
+
 		h += row(L.pid, dash(inst.pid));
 		h += row(L.lastHeartbeat, secondsAgo(inst.heartbeat));
 

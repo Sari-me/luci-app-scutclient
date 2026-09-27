@@ -69,6 +69,8 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 3. **多实例隔离**:点 WWAN 的探测/随机 MAC 按钮,只读写 WWAN 自己的字段。
 4. **dot1x 实例**:切回 802.1X 后 Location 与探测按钮隐藏,保存不受影响。
 
+**Program index 说明**:`/drcom/login` 的 `program_index` 属于门户页面运行时数据,当前版本仅支持在 Web Portal 页手动覆盖(留空则不携带该参数);是否必须携带取决于门户服务端,自动发现将在后续阶段实现。
+
 ## MWAN-safe 双 WAN 回归用例(后端 ≥ 3.3.0-3)
 
 1. **mwan3 off**:WAN dot1x 与 WWAN portal 分别单独认证正常。

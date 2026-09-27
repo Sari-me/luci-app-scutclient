@@ -528,6 +528,8 @@ local heartbeat_interval = instances:taboption(
 )
 
 heartbeat_interval.rmempty = true
+
+heartbeat_interval:depends("auth_method", "dot1x")
 heartbeat_interval.placeholder = "12"
 heartbeat_interval.datatype = "and(uinteger,min(1),max(3600))"
 
@@ -540,6 +542,8 @@ local heartbeat_timeout = instances:taboption(
 )
 
 heartbeat_timeout.rmempty = true
+
+heartbeat_timeout:depends("auth_method", "dot1x")
 heartbeat_timeout.placeholder = "2"
 heartbeat_timeout.datatype = "and(uinteger,min(1),max(3600))"
 
@@ -552,6 +556,8 @@ local eap_timeout = instances:taboption(
 )
 
 eap_timeout.rmempty = true
+
+eap_timeout:depends("auth_method", "dot1x")
 eap_timeout.placeholder = "1"
 eap_timeout.datatype = "and(uinteger,min(1),max(3600))"
 
@@ -564,6 +570,8 @@ local eap_retries = instances:taboption(
 )
 
 eap_retries.rmempty = true
+
+eap_retries:depends("auth_method", "dot1x")
 eap_retries.placeholder = "3"
 eap_retries.datatype = "and(uinteger,min(1),max(100))"
 
@@ -576,6 +584,8 @@ local onlinehook = instances:taboption(
 )
 
 onlinehook.rmempty = true
+
+onlinehook:depends("auth_method", "dot1x")
 onlinehook.description = translate(
 	"Shell command executed after EAP authentication success. "
 	.. "Use with care."
@@ -590,6 +600,8 @@ local offlinehook = instances:taboption(
 )
 
 offlinehook.rmempty = true
+
+offlinehook:depends("auth_method", "dot1x")
 offlinehook.description = translate(
 	"Shell command executed when the client is forced offline. "
 	.. "Use with care."

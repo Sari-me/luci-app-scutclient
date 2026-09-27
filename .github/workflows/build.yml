@@ -361,7 +361,13 @@ jobs:
           for opt in instance expected-mac heartbeat-interval \
                      heartbeat-timeout eap-timeout eap-retries \
                      log-level log-file log-max-size log-keep \
-                     auth-method portal-location; do
+                     auth-method portal-location portal-suffix \
+                     portal-connect-timeout portal-timeout \
+                     portal-check-interval portal-tls-verify \
+                     portal-http-port portal-https-port \
+                     portal-login-mode portal-program-index \
+                     portal-page-index portal-js-version portal-r3 \
+                     route-isolation; do
             grep -q -- "\"$opt\"" .scutclient-core/src/main.c || {
               echo "Missing CLI option: --$opt"
               exit 1

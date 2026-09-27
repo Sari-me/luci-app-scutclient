@@ -257,6 +257,12 @@ msgstr "强制 mwan3 use"
 msgid "Auto launches the instance through 'mwan3 use' when mwan3 is running, so authentication traffic keeps its WAN identity under policy routing. Native uses the daemon bindings only."
 msgstr "自动模式在 mwan3 运行时通过 'mwan3 use' 启动实例,使认证流量在策略路由下仍保持 WAN 身份。原生模式仅使用守护进程自身绑定。"
 
+msgid "Portal backend"
+msgstr "Portal 后端"
+
+msgid "Source IPv4"
+msgstr "源 IPv4"
+
 msgid "Heartbeat interval (seconds)"
 msgstr "心跳间隔(秒)"
 
