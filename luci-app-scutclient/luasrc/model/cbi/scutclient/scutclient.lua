@@ -737,4 +737,38 @@ portal_tls_verify.description = translate(
 )
 
 
+local portal_http_port = instances:taboption(
+	"portal",
+	Value,
+	"portal_http_port",
+	translate("ePortal HTTP port")
+)
+
+portal_http_port.rmempty = true
+portal_http_port.placeholder = "801"
+portal_http_port.datatype = "port"
+portal_http_port:depends("auth_method", "portal")
+portal_http_port.description = translate(
+	"ePortal login port used when the Location is http://. "
+	.. "Leave empty to use the protocol default."
+)
+
+
+local portal_https_port = instances:taboption(
+	"portal",
+	Value,
+	"portal_https_port",
+	translate("ePortal HTTPS port")
+)
+
+portal_https_port.rmempty = true
+portal_https_port.placeholder = "802"
+portal_https_port.datatype = "port"
+portal_https_port:depends("auth_method", "portal")
+portal_https_port.description = translate(
+	"ePortal login port used when the Location is https://. "
+	.. "Leave empty to use the protocol default."
+)
+
+
 return scut
