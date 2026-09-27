@@ -1,7 +1,29 @@
 <!-- Per-instance portal Location probe (DummyValue template).
-     The button carries the exact UCI section id and reads/writes this
-     instance's fields by their full cbid - it can never touch another
-     instance. Shown only when auth_method=portal (CBI depends). -->
+     The button resolves its own UCI section id from data-scut-section,
+     falling back to the per-instance container id (cbi-scutclient-<sid>),
+     and reads/writes this instance's fields by their full cbid - it can
+     never touch another instance. Shown only when auth_method=portal. -->
+<style type="text/css">
+.scut-portal-probe-status {
+	margin-left: .75rem;
+}
+
+.scut-portal-probe-status.scut-good {
+	color: #2d8a34;
+	font-weight: 600;
+}
+
+.scut-portal-probe-status.scut-warn {
+	color: #c17d00;
+	font-weight: 600;
+}
+
+.scut-portal-probe-status.scut-bad {
+	color: #c9302c;
+	font-weight: 600;
+}
+</style>
+
 <div class="cbi-value" id="<%=self.option%>-<%=section or ''%>">
 	<button type="button"
 		class="cbi-button cbi-button-apply scut-portal-probe-btn"
@@ -27,7 +49,8 @@
 		noLocation: '<%:HTTP response without Location%>',
 		notReady: '<%:Interface is not ready.%>',
 		failed: '<%:Probe failed.%>',
-		stale: '<%:Interface changed. Test Location again.%>'
+		stale: '<%:Interface changed. Test Location again.%>',
+		unknown: '<%:Probe button state could not be determined. Reload the page.%>'
 	};
 </script>
 
@@ -35,14 +58,34 @@
 if (typeof scutProbeInit === 'undefined') {
 	window.scutProbeInit = true;
 
-	window.scutProbeField = function(section, option) {
-		return document.getElementById(
-			'cbid.scutclient.' + section + '.' + option
-		);
+	window.scutProbeField = function(sid, option) {
+		return sid
+			? document.getElementById('cbid.scutclient.' + sid + '.' + option)
+			: null;
+	};
+
+	// 主来源是模板写入的 data-scut-section；若主题/缓存导致其为空，
+	// 则从所在实例容器 id（cbi-scutclient-<sid>）反解。
+	window.scutProbeSection = function(btn) {
+		var sid = btn.getAttribute('data-scut-section');
+
+		if (sid) {
+			return sid;
+		}
+
+		var node = btn.closest
+			? btn.closest('.cbi-section-node')
+			: null;
+
+		if (node && node.id && node.id.indexOf('cbi-scutclient-') === 0) {
+			return node.id.substring('cbi-scutclient-'.length);
+		}
+
+		return '';
 	};
 
 	window.scutProbeRefresh = function(btn) {
-		var sid = btn.getAttribute('data-scut-section');
+		var sid = scutProbeSection(btn);
 		var method = scutProbeField(sid, 'auth_method');
 		var iface = scutProbeField(sid, 'interface');
 
@@ -53,10 +96,18 @@ if (typeof scutProbeInit === 'undefined') {
 		);
 	};
 
+	window.scutProbeRefreshAll = function() {
+		var buttons = document.querySelectorAll('button.scut-portal-probe-btn');
+
+		Array.prototype.forEach.call(buttons, scutProbeRefresh);
+	};
+
 	window.scutProbeStatus = function(sid, html, cls) {
-		var nodes = document.querySelectorAll(
-			'span.scut-portal-probe-status[data-scut-section="' + sid + '"]'
-		);
+		var nodes = sid === ''
+			? document.querySelectorAll('span.scut-portal-probe-status')
+			: document.querySelectorAll(
+				'span.scut-portal-probe-status[data-scut-section="' + sid + '"]'
+			);
 
 		Array.prototype.forEach.call(nodes, function(node) {
 			node.innerHTML = html;
@@ -65,11 +116,17 @@ if (typeof scutProbeInit === 'undefined') {
 	};
 
 	window.scutProbeLocation = function(btn) {
-		var sid = btn.getAttribute('data-scut-section');
+		var sid = scutProbeSection(btn);
 		var iface = scutProbeField(sid, 'interface');
 		var location = scutProbeField(sid, 'portal_location');
 
-		if (!iface || !iface.value || btn.disabled) {
+		if (!sid || !iface) {
+			scutProbeStatus(sid, scutProbeL.unknown, 'scut-bad');
+			return;
+		}
+
+		if (!iface.value) {
+			scutProbeStatus(sid, scutProbeL.notReady, 'scut-bad');
 			return;
 		}
 
@@ -143,46 +200,24 @@ if (typeof scutProbeInit === 'undefined') {
 		);
 	};
 
-	window.scutProbeBind = function() {
-		var buttons = document.querySelectorAll(
-			'button.scut-portal-probe-btn[data-scut-section]'
-		);
+	// 事件委托：页面上任何表单值变化都重新计算全部按钮状态。
+	// 不再逐元素绑定 change，天然覆盖 tab 切换、主题脚本与动态节点。
+	if (!window.scutProbeDelegated) {
+		window.scutProbeDelegated = true;
 
-		Array.prototype.forEach.call(buttons, function(btn) {
-			var sid = btn.getAttribute('data-scut-section');
-			var method = scutProbeField(sid, 'auth_method');
-			var iface = scutProbeField(sid, 'interface');
-
-			if (method && !method.dataset.scutProbe) {
-				method.dataset.scutProbe = "1";
-				method.addEventListener('change', function() {
-					scutProbeRefresh(btn);
-				});
-			}
-
-			if (iface && !iface.dataset.scutProbe) {
-				iface.dataset.scutProbe = "1";
-				iface.addEventListener('change', function() {
-					scutProbeRefresh(btn);
-
-					// WAN 变更后旧 Location 视为未验证（不自动清除）
-					var location = scutProbeField(sid, 'portal_location');
-					if (location && location.value) {
-						scutProbeStatus(sid, scutProbeL.stale, 'scut-warn');
-					} else {
-						scutProbeStatus(sid, '', '');
-					}
-				});
-			}
-
-			scutProbeRefresh(btn);
+		document.addEventListener('change', function() {
+			scutProbeRefreshAll();
 		});
-	};
+	}
+
+	// 初始状态：解析后立即算一次，DOMContentLoaded 再兜底一次，
+	// 并留一个延迟刷新应对主题在 DOM ready 之后才插入表单节点的情况。
+	scutProbeRefreshAll();
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', scutProbeBind);
-	} else {
-		scutProbeBind();
+		document.addEventListener('DOMContentLoaded', scutProbeRefreshAll);
 	}
+
+	window.setTimeout(scutProbeRefreshAll, 800);
 }
 </script>
