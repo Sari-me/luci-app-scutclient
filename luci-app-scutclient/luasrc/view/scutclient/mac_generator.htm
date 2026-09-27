@@ -1,42 +1,86 @@
-<!-- Per-instance random MAC generator (DummyValue template) -->
+<!-- Per-instance random MAC generator (DummyValue template).
+     The button carries the exact UCI section id and addresses the
+     instance's inputs by their full cbid, so it can never touch
+     another instance's fields. -->
 <div class="cbi-value" id="<%=self.option%>-<%=section or ''%>">
-	<button type="button" class="cbi-button cbi-button-apply" onclick="scutGenerateMac(this); return false;">
+	<button type="button" class="cbi-button cbi-button-apply"
+		data-scut-section="<%=section or ''%>"
+		onclick="scutGenerateMac(this); return false;">
 		<%:Generate random MAC%>
 	</button>
 </div>
 
 <script type="text/javascript">
-// LuCI 多实例下每个 section 都渲染一份按钮；
-// 通过最近的 cbi-section 容器定位本实例的 macaddr 输入框。
 if (typeof scutGenerateMac === 'undefined') {
 	window.scutGenerateMac = function(btn) {
-		var scope = btn.closest('.cbi-section') || document;
-		var input = scope.querySelector('input[id$=".macaddr"]');
+		var sid = btn.getAttribute('data-scut-section');
+
+		if (!sid) {
+			return;
+		}
+
+		var input = document.getElementById(
+			'cbid.scutclient.' + sid + '.macaddr'
+		);
+		var mode = document.getElementById(
+			'cbid.scutclient.' + sid + '.mac_mode'
+		);
 
 		if (!input) {
 			return;
 		}
 
-		var b = new Array(6);
-		var i;
+		// MAC 在页面内跨实例唯一
+		var used = {};
+		Array.prototype.forEach.call(
+			document.querySelectorAll(
+				'input[id^="cbid.scutclient."][id$=".macaddr"]'
+			),
+			function(other) {
+				if (other !== input && other.value) {
+					used[other.value.toUpperCase()] = true;
+				}
+			}
+		);
 
-		for (i = 0; i < 6; i++) {
-			b[i] = Math.floor(Math.random() * 256);
+		var b = new Uint8Array(6);
+		var i, attempt, mac, ok = false;
+
+		for (attempt = 0; attempt < 16; attempt++) {
+			if (window.crypto && window.crypto.getRandomValues) {
+				window.crypto.getRandomValues(b);
+			} else {
+				for (i = 0; i < 6; i++) {
+					b[i] = Math.floor(Math.random() * 256);
+				}
+			}
+
+			// Locally administered (bit1=1) and unicast (bit0=0)
+			b[0] = (b[0] & 0xFC) | 0x02;
+
+			var parts = Array.prototype.map.call(b, function(n) {
+				return ('0' + n.toString(16).toUpperCase()).slice(-2);
+			});
+			mac = parts.join(':');
+
+			if (!used[mac]) {
+				ok = true;
+				break;
+			}
 		}
 
-		// Locally administered (bit1=1) and unicast (bit0=0)
-		b[0] = (b[0] & 0xFC) | 0x02;
-
-		var hex = function(n) {
-			return (n < 16 ? '0' : '') + n.toString(16).toUpperCase();
-		};
-
-		var parts = new Array(6);
-		for (i = 0; i < 6; i++) {
-			parts[i] = hex(b[i]);
+		if (!ok) {
+			return;
 		}
 
-		input.value = parts.join(':');
+		input.value = mac;
+
+		if (mode && mode.value !== 'random') {
+			mode.value = 'random';
+			mode.dispatchEvent(new Event('change', { bubbles: true }));
+		}
+
+		input.dispatchEvent(new Event('change', { bubbles: true }));
 	};
 }
 </script>
