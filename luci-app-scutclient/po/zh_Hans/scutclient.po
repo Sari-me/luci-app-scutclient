@@ -162,11 +162,11 @@ msgstr "Web Portal"
 msgid "Portal protocol"
 msgstr "Portal 协议"
 
-msgid "Service type"
-msgstr "服务类型"
-
 msgid "Account suffix"
 msgstr "账号后缀"
+
+msgid "Optional account suffix. Leave empty for normal campus accounts. Examples: @dx, @lt."
+msgstr "可选的账号后缀。普通校园账号请留空。示例:@dx、@lt。"
 
 msgid "Connect timeout (seconds)"
 msgstr "连接超时(秒)"

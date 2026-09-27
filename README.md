@@ -61,3 +61,10 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 3. **实例独立认证状态**:一个实例用正确账号、另一个故意用错误密码,两张卡应分别显示 `在线` 与 `认证失败`,而不是共享一个全局网络状态。
 4. **心跳超时**:人为阻断 WWAN 心跳后,该实例显示 `重连中` 且进程仍为 `运行中`(状态不再等同于 PID)。
 5. **无线掉线隔离**:`ifdown wwan` 后 WWAN 显示 `等待接口`/`已停止`,WAN 实例状态不变;`ifup wwan` 后 WWAN 自动恢复。
+
+## Portal 表单与探测回归用例
+
+1. **Portal 保存**:portal 实例只填 username/password/interface/Location,UCI 中不存在 `server_auth_ip/dns/version/hash/hostname` 五个 dot1x 字段时,Save & Apply 必须成功且无"必选项值为空"报错(这些字段由 init 的运行时默认值兜底)。
+2. **探测按钮状态**:portal 实例 interface 为空时按钮禁用,选择 wwan 后立即变为可点,无需保存。
+3. **多实例隔离**:点 WWAN 的探测/随机 MAC 按钮,只读写 WWAN 自己的字段。
+4. **dot1x 实例**:切回 802.1X 后 Location 与探测按钮隐藏,保存不受影响。
