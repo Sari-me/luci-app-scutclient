@@ -183,6 +183,18 @@ msgstr "校验 TLS 证书"
 msgid "Validate https:// portal certificates against the system CA bundle."
 msgstr "对 https:// Portal 使用系统 CA 校验证书。"
 
+msgid "ePortal HTTP port"
+msgstr "ePortal HTTP 端口"
+
+msgid "ePortal HTTPS port"
+msgstr "ePortal HTTPS 端口"
+
+msgid "ePortal login port used when the Location is http://. Leave empty to use the protocol default."
+msgstr "Location 为 http:// 时登录使用的 ePortal 端口。留空使用协议默认值。"
+
+msgid "ePortal login port used when the Location is https://. Leave empty to use the protocol default."
+msgstr "Location 为 https:// 时登录使用的 ePortal 端口。留空使用协议默认值。"
+
 # ---------- Dr.COM Tab ----------
 msgid "Authentication server"
 msgstr "认证服务器"

@@ -68,3 +68,12 @@ opkg install /tmp/luci-app-scutclient_*.ipk
 2. **探测按钮状态**:portal 实例 interface 为空时按钮禁用,选择 wwan 后立即变为可点,无需保存。
 3. **多实例隔离**:点 WWAN 的探测/随机 MAC 按钮,只读写 WWAN 自己的字段。
 4. **dot1x 实例**:切回 802.1X 后 Location 与探测按钮隐藏,保存不受影响。
+
+## Portal Location 解析回归用例(后端 ≥ 3.3.0)
+
+1. **HTTPS 不降级**:Location 为 `https://...` 时,状态页/日志显示 chkstatus 走 `https://<host>:443`,绝不再出现 `http://<host>:80`。
+2. **显式端口保留**:Location 带 `:8443` 时,kernel 接口与 origin 继续使用 8443,不回退 443。
+3. **path/query 保留**:Location 的路径与查询串(wlanacname 等)在启动日志的解析概要之外完整保存在实例配置中,不被丢弃。
+4. **ePortal 端口可覆盖**:http Location 默认 801、https 默认 802,`portal_http_port`/`portal_https_port` 覆盖后登录请求命中新端口。
+5. **网卡绑定**:双 WAN 下 portal 实例绑定 WWAN,抓包确认 chkstatus/login/logout 全部从 WWAN 真实网卡发出。
+6. **退出生命周期**:portal 模式 SIGTERM / Log off 只发 portal 注销,不发送 EAPOL Logoff,无 "Bad file descriptor"。
