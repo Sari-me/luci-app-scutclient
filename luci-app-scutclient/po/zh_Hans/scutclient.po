@@ -1,0 +1,342 @@
+# luci-app-scutclient 简体中文翻译
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: luci-app-scutclient 1.5.0\n"
+
+# ---------- 菜单(controller) ----------
+msgid "SCUT Client"
+msgstr "SCUT 客户端"
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Logs"
+msgstr "日志"
+
+msgid "About"
+msgstr "关于"
+
+# ---------- 设置页(Map/section) ----------
+msgid "SCUT Client Settings"
+msgstr "SCUT 客户端设置"
+
+msgid "Manage multiple authentication instances. Every instance binds one WAN and runs its own process and log. Save the settings before restarting the service."
+msgstr "管理多个认证实例。每个实例绑定一个 WAN,拥有独立进程与日志。重启服务前请先保存设置。"
+
+msgid "General Settings"
+msgstr "常规设置"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Master switch of the scutclient service. Disabled instances never start."
+msgstr "scutclient 服务总开关。关闭后所有实例都不会启动。"
+
+msgid "Authentication Instances"
+msgstr "认证实例"
+
+msgid "The section name is the instance id used by the service, the status page and the log file. One WAN can only be bound by one instance."
+msgstr "配置节名称即实例 ID,用于服务、状态页和日志文件。一个 WAN 只能被一个实例绑定。"
+
+msgid "Basic Settings"
+msgstr "基本设置"
+
+msgid "Dr.COM Settings"
+msgstr "Dr.COM 设置"
+
+msgid "Advanced Settings"
+msgstr "高级设置"
+
+msgid "Logging"
+msgstr "日志"
+
+# ---------- Basic Tab ----------
+msgid "Enabled"
+msgstr "已启用"
+
+msgid "Display name"
+msgstr "显示名称"
+
+msgid "Username"
+msgstr "用户名"
+
+msgid "Usually your student number or the username issued by the university."
+msgstr "通常是你的学号或学校分配的用户名。"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Authentication interface"
+msgstr "认证接口"
+
+msgid "Used by %s"
+msgstr "已被 %s 使用"
+
+msgid "Logical OpenWrt network interface used for authentication. The service resolves it to the actual network device automatically. Each interface can only be bound by one instance."
+msgstr "用于认证的 OpenWrt 逻辑接口。服务会自动将其解析为真实网络设备。每个接口只能被一个实例绑定。"
+
+msgid "Please select an interface."
+msgstr "请选择接口。"
+
+msgid "Interface '%s' is already used by instance '%s'. One WAN can only be bound by one instance."
+msgstr "接口 '%s' 已被实例 '%s' 使用。一个 WAN 只能被一个实例绑定。"
+
+msgid "MAC mode"
+msgstr "MAC 模式"
+
+msgid "Keep the current interface MAC"
+msgstr "保持当前接口 MAC"
+
+msgid "Random MAC"
+msgstr "随机 MAC"
+
+msgid "Custom MAC"
+msgstr "自定义 MAC"
+
+msgid "Random MACs are generated once and stored with the instance."
+msgstr "随机 MAC 只生成一次,并保存在实例配置中。"
+
+msgid "MAC address"
+msgstr "MAC 地址"
+
+msgid "Target MAC for random/custom mode. Leave empty in random mode to generate one automatically on the first start."
+msgstr "随机/自定义模式使用的目标 MAC。随机模式下留空则首次启动时自动生成。"
+
+msgid "Generate random MAC"
+msgstr "生成随机 MAC"
+
+# ---------- Dr.COM Tab ----------
+msgid "Authentication server"
+msgstr "认证服务器"
+
+msgid "DNS server"
+msgstr "DNS 服务器"
+
+msgid "Dr.com version"
+msgstr "Dr.com 版本"
+
+msgid "DrAuthSvr.dll hash"
+msgstr "DrAuthSvr.dll 哈希"
+
+msgid "Allowed online time"
+msgstr "允许联网时间"
+
+msgid "Invalid time format. Use H:MM or HH:MM, for example 6:15."
+msgstr "时间格式无效。使用 H:MM 或 HH:MM,例如 6:15。"
+
+msgid "Hostname sent to server"
+msgstr "发送给服务器的主机名"
+
+# ---------- Advanced Tab ----------
+msgid "Heartbeat interval (seconds)"
+msgstr "心跳间隔(秒)"
+
+msgid "Heartbeat timeout (seconds)"
+msgstr "心跳超时(秒)"
+
+msgid "EAP receive timeout (seconds)"
+msgstr "EAP 接收超时(秒)"
+
+msgid "EAP retries"
+msgstr "EAP 重试次数"
+
+msgid "Online hook"
+msgstr "上线钩子"
+
+msgid "Shell command executed after EAP authentication success. Use with care."
+msgstr "EAP 认证成功后执行的 shell 命令。请谨慎使用。"
+
+msgid "Offline hook"
+msgstr "下线钩子"
+
+msgid "Shell command executed when the client is forced offline. Use with care."
+msgstr "客户端被强制下线时执行的 shell 命令。请谨慎使用。"
+
+# ---------- Logging Tab ----------
+msgid "Log level"
+msgstr "日志等级"
+
+msgid "Maximum log size (bytes)"
+msgstr "日志最大字节数"
+
+msgid "Log files to keep"
+msgstr "保留日志份数"
+
+msgid "System log"
+msgstr "系统日志"
+
+msgid "Mirror log output to the OpenWrt system log via procd."
+msgstr "通过 procd 将日志输出到 OpenWrt 系统日志。"
+
+msgid "Per-instance file log"
+msgstr "实例文件日志"
+
+msgid "Write this instance's log to /tmp/scutclient/<instance>.log."
+msgstr "将此实例的日志写入 /tmp/scutclient/<实例>.log。"
+
+# ---------- 快捷链接(quicklinks) ----------
+msgid "Common OpenWrt pages used while preparing the authentication network."
+msgstr "配置认证网络时常用的 OpenWrt 页面。"
+
+msgid "Wireless"
+msgstr "无线"
+
+msgid "Interfaces"
+msgstr "接口"
+
+msgid "Administration"
+msgstr "系统管理"
+
+# ---------- 状态页(status) ----------
+msgid "SCUT Client Status"
+msgstr "SCUT 客户端状态"
+
+msgid "Overview of every authentication instance. Account passwords are intentionally never displayed here."
+msgstr "所有认证实例的总览。此处刻意不显示账号密码。"
+
+msgid "Service"
+msgstr "服务"
+
+msgid "Network status"
+msgstr "网络状态"
+
+msgid "Loading…"
+msgstr "加载中…"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Yes"
+msgstr "是"
+
+msgid "No"
+msgstr "否"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Restart"
+msgstr "重启"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Log off"
+msgstr "下线"
+
+msgid "State"
+msgstr "状态"
+
+msgid "Account"
+msgstr "账号"
+
+msgid "Network"
+msgstr "网络"
+
+msgid "Device"
+msgstr "设备"
+
+msgid "IPv4 address"
+msgstr "IPv4 地址"
+
+msgid "PID"
+msgstr "PID"
+
+msgid "Installed version"
+msgstr "已安装版本"
+
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Applying…"
+msgstr "正在执行…"
+
+msgid "Operation completed."
+msgstr "操作完成。"
+
+msgid "Operation failed."
+msgstr "操作失败。"
+
+msgid "No instances configured. Add one on the Settings page."
+msgstr "尚未配置实例。请在设置页添加。"
+
+msgid "Internet available"
+msgstr "互联网可用"
+
+msgid "Campus authentication may be required"
+msgstr "可能需要进行校园网认证"
+
+msgid "No Internet connectivity"
+msgstr "无互联网连接"
+
+msgid "Unknown"
+msgstr "未知"
+
+# ---------- 日志页(logs) ----------
+msgid "SCUT Client Logs"
+msgstr "SCUT 客户端日志"
+
+msgid "Per-instance log files under /tmp/scutclient. Only tail lines are shown; use Download for the full file."
+msgstr "实例日志位于 /tmp/scutclient 下。页面仅显示尾部日志,完整内容请使用下载。"
+
+msgid "Instance"
+msgstr "实例"
+
+msgid "Level"
+msgstr "等级"
+
+msgid "All"
+msgstr "全部"
+
+msgid "Lines"
+msgstr "行数"
+
+msgid "Auto Refresh"
+msgstr "自动刷新"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Clear"
+msgstr "清空"
+
+msgid "Download"
+msgstr "下载"
+
+msgid "Clear this instance log?"
+msgstr "确定清空该实例日志?"
+
+msgid "No scutclient log is available."
+msgstr "暂无 scutclient 日志。"
+
+# ---------- 关于页(about) ----------
+msgid "License"
+msgstr "许可证"
+
+msgid "LuCI interface: Apache License 2.0"
+msgstr "LuCI 界面:Apache License 2.0"
+
+msgid "scutclient core"
+msgstr "scutclient 核心"
+
+msgid "Commercial use of the scutclient code by any individual or organization is prohibited. Any consequences and legal liabilities arising from it are borne by the violator."
+msgstr "特别指出禁止任何个人或组织将 scutclient 的代码投入商业使用,由此造成的后果和法律责任自负。"
+
+msgid "Acknowledgements"
+msgstr "致谢"
+
+msgid "The owner's cat"
+msgstr "群主的猫"
+
+msgid "SCUT Router Group on Sina Weibo"
+msgstr "华工路由器群官方微博"
+
+msgid "QQ group"
+msgstr "QQ 群"
