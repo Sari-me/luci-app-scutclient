@@ -215,6 +215,47 @@ local function check_instance_param(instance)
 	return true
 end
 
+-- Portal 探测：logical interface 必须真实存在于 /etc/config/network，
+-- 字符集校验拒绝注入；不接受 url/device/command 等其他输入。
+local function valid_logical_interface(name)
+	if type(name) ~= "string"
+		or name == ""
+		or #name > 64
+	then
+		return false
+	end
+
+	if not name:match("^[%w_.%-]+$") then
+		return false
+	end
+
+	local found = false
+
+	uci:foreach("network", "interface", function(s)
+		if s[".name"] == name then
+			found = true
+		end
+	end)
+
+	return found
+end
+
+local function resolve_runtime_device(interface)
+	local dump = get_network_dump()
+
+	if type(dump) ~= "table" then
+		return nil
+	end
+
+	for _, net in ipairs(dump) do
+		if net.interface == interface then
+			return net.l3_device or net.device
+		end
+	end
+
+	return nil
+end
+
 function index()
 	if not fs.access("/etc/config/scutclient") then
 		return
@@ -266,6 +307,13 @@ function index()
 	entry(
 		{"admin", "services", "scutclient", "api_service"},
 		post("action_api_service")
+	).leaf = true
+
+	-- Portal Location 探测：POST + CSRF token；使用当前表单的
+	-- logical WAN，不要求实例已保存到 UCI。
+	entry(
+		{"admin", "services", "scutclient", "api_portal_probe"},
+		post("action_api_portal_probe")
 	).leaf = true
 
 	entry(
@@ -396,6 +444,77 @@ function action_api_status()
 			uci:get_first("scutclient", "option", "enable") == "1",
 		version = get_package_version(),
 		instances = instances
+	})
+end
+
+function action_api_portal_probe()
+	local interface = http.formvalue("interface") or ""
+
+	if not valid_logical_interface(interface) then
+		http.status(400, "Bad Request")
+		return json_response({
+			success = false,
+			reason = "invalid_interface"
+		})
+	end
+
+	local device = resolve_runtime_device(interface)
+
+	if not device
+		or device == ""
+		or not device:match("^[%w_.:%-]+$")
+	then
+		return json_response({
+			success = false,
+			reason = "interface_not_ready",
+			interface = interface
+		})
+	end
+
+	local output = trim(sys.exec(
+		"/usr/lib/scutclient/scutclient-portal-probe " ..
+		util.shellquote(device) .. " 2>/dev/null"
+	))
+
+	local http_code = tonumber(output:match("http_code=(%d+)"))
+	local location = trim(output:match("location=(.+)") or "")
+
+	if not http_code then
+		return json_response({
+			success = false,
+			reason = "request_failed",
+			interface = interface,
+			device = device
+		})
+	end
+
+	-- 成功条件：300~399 且 Location 为 http(s):// 绝对地址
+	if location ~= ""
+		and location:match("^https?://")
+		and http_code >= 300
+		and http_code <= 399
+	then
+		return json_response({
+			success = true,
+			interface = interface,
+			device = device,
+			http_code = http_code,
+			location = location
+		})
+	end
+
+	local reason = "no_redirect"
+
+	if http_code == 200 then
+		reason = "no_location"
+	end
+
+	return json_response({
+		success = false,
+		reason = reason,
+		http_code = http_code,
+		interface = interface,
+		device = device
 	})
 end
 
